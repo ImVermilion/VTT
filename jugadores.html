@@ -70,15 +70,21 @@
 
     <audio id="audio-ambiente-vtt" loop></audio>
 
-    <script src="pantalla.js"></script>
+    <!-- 1. PRIMERO: La librería de Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- 2. SEGUNDO: Tu configuración de Supabase -->
     <script>
-  // Inicialización (Usa tus claves de Supabase Settings > API)
-  const supabaseUrl = 'https://kbaxoysuotwwrolybenw.supabase.co';
-  const supabaseKey = 'sb_publishable_ethKeei2lOPZUEXpkWr8bQ_DcbplFdt';
-  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-  
-  // Creamos un canal de comunicación en tiempo real
-  const canalVTT = supabase.channel('sala-partida');
-</script>
+      // Inicialización
+      const supabaseUrl = 'https://kbaxoysuotwwrolybenw.supabase.co';
+      const supabaseKey = 'sb_publishable_ethKeei2lOPZUEXpkWr8bQ_DcbplFdt';
+      const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+      
+      // Creamos un canal de comunicación en tiempo real
+      const canalVTT = supabase.channel('sala-partida');
+    </script>
+
+    <!-- 3. TERCERO: TU ARCHIVO JS (pantalla.js) -->
+    <script src="pantalla.js"></script>
 </body>
 </html>
