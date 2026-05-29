@@ -101,10 +101,21 @@ function tirarDadoGenericoJugador(caras) {
 
 // --- RECIBIR DEL DM Y SINCRONIZAR (SUPABASE) ---
 async function inicializarProyeccionOnline() {
-    if (typeof supabase === 'undefined') {
+    if (typeof supabaseClient === 'undefined') {
         console.warn("Supabase no está configurado. El mapa no funcionará online.");
         return;
     }
+
+    
+    let { data, error } = await supabaseClient.from('vtt_estado').select('*').eq('id', 1).single();
+    if (data) aplicarEstadoVTT(data);
+
+    
+    supabaseClient.channel('cambios-db')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vtt_estado' }, payload => {
+            aplicarEstadoVTT(payload.new);
+        })
+        .subscribe();
 
     // 1. Cargar el estado inicial de la base de datos
     let { data, error } = await supabase.from('vtt_estado').select('*').eq('id', 1).single();

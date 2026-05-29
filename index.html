@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>DM VTT Master - Panel</title>
+    <link rel="stylesheet" href="estilos.css">
+</head>
+<body class="dm-layout">
+
+    <div id="menu-token" class="context-menu">
+        <button onclick="accionToken('visibilidad')">👁️ Ocultar / Mostrar</button>
+        <button onclick="accionToken('escala')">📏 Cambiar Tamaño</button>
+        <div style="padding: 5px; text-align: center;"><label>🎨 Color: <input type="color" id="color-token" onchange="accionToken('color', this.value)"></label></div>
+        <hr style="border-color:#555; margin: 5px 0;">
+        <button onclick="accionToken('borrar')" style="color: #ff6b6b;">🗑️ Borrar Token</button>
+        <button onclick="cerrarMenuToken()" style="font-size: 0.8rem; color: #aaa;">❌ Cerrar</button>
+    </div>
+
+    <aside class="dm-panel">
+        <h3>📚 Mi Campaña</h3>
+        <ul id="arbol-glosario"></ul>
+    </aside>
+
+    <main class="dm-panel" style="display:flex; flex-direction:column;">
+        <nav class="dm-pestanas">
+            <button onclick="cambiarVista('vista-mapa-dm')" class="activa">🗺️ Tablero</button>
+            <button onclick="cambiarVista('vista-editor')">📝 Wiki</button>
+            <button onclick="cambiarVista('vista-fichas')">👥 Fichas</button>
+            <button onclick="cambiarVista('vista-dados')">🎲 Arena</button>
+        </nav>
+
+        <div id="vista-mapa-dm" class="dm-vista activa">
+            <div class="centrador-mapa" onclick="cerrarMenuToken()">
+                <div id="wrapper-mapa" class="wrapper-mapa" style="display: none;">
+                    <img id="img-mapa" class="img-mapa" src="">
+                    <div id="capa-rejilla" class="rejilla"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="vista-editor" class="dm-vista">
+            <input type="text" id="editor-titulo" placeholder="Título..." oninput="guardarArticuloActual()">
+            <textarea id="editor-contenido" placeholder="Historia, notas..." oninput="guardarArticuloActual()"></textarea>
+        </div>
+
+        <div id="vista-fichas" class="dm-vista">
+            <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+                <button onclick="crearFichaNueva()" style="background: #2ecc71; color: white;">+ Nueva Ficha</button>
+                <button onclick="exportarFichaSeleccionada()" style="background: #f1c40f; color: black;">💾 Exportar</button>
+                <label style="background: #3498db; color: white; padding: 5px 10px; cursor: pointer; border-radius: 4px;">📥 Importar <input type="file" id="input-importar-ficha" accept=".json" style="display:none;"></label>
+            </div>
+            <div style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; height: calc(100% - 50px);">
+                <div style="background: #111; padding: 10px; border-radius: 5px; overflow-y: auto;" id="lista-fichas-ui"></div>
+                <div id="editor-ficha-ui" style="display: none; background: #222; padding: 15px; border-radius: 5px; overflow-y: auto;">
+                    <input type="text" id="ficha-nombre" class="input-ficha" style="font-size:1.5rem; font-weight:bold; border-bottom:2px solid #555;" placeholder="Nombre..." oninput="guardarFichaActual()">
+                    <div class="grid-stats-dm">
+                        <div><label>HP:</label><input type="text" id="ficha-hp" class="input-ficha" oninput="guardarFichaActual()"></div>
+                        <div><label>CA:</label><input type="text" id="ficha-ca" class="input-ficha" oninput="guardarFichaActual()"></div>
+                        <div><label>Iniciativa:</label><input type="text" id="ficha-ini" class="input-ficha" oninput="guardarFichaActual()"></div>
+                        <div><label>Velocidad:</label><input type="text" id="ficha-vel" class="input-ficha" oninput="guardarFichaActual()"></div>
+                    </div>
+                    <div class="grid-atributos-dm" style="margin-top: 15px;">
+                        <div><label>FUE</label><input type="text" id="ficha-fue" class="input-ficha" oninput="guardarFichaActual()"></div>
+                        <div><label>DES</label><input type="text" id="ficha-des" class="input-ficha" oninput="guardarFichaActual()"></div>
+                        <div><label>CON</label><input type="text" id="ficha-con" class="input-ficha" oninput="guardarFichaActual()"></div>
+                        <div><label>INT</label><input type="text" id="ficha-int" class="input-ficha" oninput="guardarFichaActual()"></div>
+                        <div><label>SAB</label><input type="text" id="ficha-sab" class="input-ficha" oninput="guardarFichaActual()"></div>
+                        <div><label>CAR</label><input type="text" id="ficha-car" class="input-ficha" oninput="guardarFichaActual()"></div>
+                    </div>
+                    <textarea id="ficha-notas" style="width: 100%; height: 150px; background: #111; color: white; border: 1px solid #444; padding: 10px; margin-top:10px;" oninput="guardarFichaActual()" placeholder="Notas..."></textarea>
+                    <button onclick="borrarFichaActual()" style="background: #e74c3c; color: white; margin-top: 10px;">Borrar Ficha</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="vista-dados" class="dm-vista">
+            <div id="arena-3d" style="height:100%; display:flex; justify-content:center; align-items:center;">
+                <p style="color: #666; text-align: center;">Lanza un dado en el panel inferior</p>
+            </div>
+        </div>
+    </main>
+
+    <aside id="gestor-tablero" class="dm-panel">
+        <h3>📂 Archivos y Tablero</h3>
+        <div style="background: #1e1e1e; padding: 10px; border-radius: 5px; border: 1px solid #444;">
+            <input type="file" id="input-archivo" accept="image/*" style="width: 100%; margin: 5px 0;">
+            <select id="tipo-archivo" style="width: 100%; padding: 5px; background: #333; color: white; border: none;">
+                <option value="mapa">Mapa</option>
+                <option value="token">Token</option>
+            </select>
+            <button id="btn-guardar-galeria" style="background: #3498db; color: white; width: 100%; margin-top: 5px;">Añadir a Galería</button>
+        </div>
+        <hr style="border-color: #444; margin: 15px 0;">
+        <button id="btn-toggle-rejilla" style="background: #9b59b6; color: white; width: 100%; margin-bottom: 5px;"># Rejilla (5 pies)</button>
+        <button id="btn-enviar-mapa" style="background: #4CAF50; color: white; width: 100%; margin-bottom: 5px;">Proyectar Tablero</button>
+        <button onclick="vaciarTablero()" style="background: #e67e22; color: white; width: 100%; font-size: 0.8rem;">🧹 Vaciar Tablero</button>
+        <div id="galeria-mapas" class="contenedor-galeria" style="margin-top:10px;"></div>
+        <hr style="border-color: #444; margin: 15px 0;">
+        <h4>🧙‍♂️ Tokens (Clic)</h4>
+        <div id="galeria-tokens" class="contenedor-galeria"></div>
+        
+        <hr style="border-color: #444; margin: 15px 0;">
+        <h4>🎵 Música Ambientación</h4>
+        <div style="background: #1e1e1e; padding: 10px; border-radius: 5px; border: 1px solid #444;">
+            <input type="file" id="input-audio" accept="audio/*" style="width: 100%; margin-bottom: 8px;">
+            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                <button id="btn-play-audio" style="background: #2ecc71; color: white; flex: 1;">▶ Play</button>
+                <button id="btn-pause-audio" style="background: #e74c3c; color: white; flex: 1;">⏸ Pausa</button>
+            </div>
+            <label style="font-size: 0.75rem; color:#aaa;">Volumen:</label>
+            <input type="range" id="volume-audio" min="0" max="1" step="0.1" value="0.5" style="width: 100%;">
+            <p id="status-audio" style="font-size: 0.75rem; color: #aaa; text-align: center; margin-top:5px;">Sin audio</p>
+        </div>
+    </aside>
+
+    <footer id="controles-rapidos" class="dm-panel">
+        <button class="btn-dado" onclick="lanzarDado(4)">d4</button>
+        <button class="btn-dado" onclick="lanzarDado(6)">d6</button>
+        <button class="btn-dado" onclick="lanzarDado(8)">d8</button>
+        <button class="btn-dado" onclick="lanzarDado(10)">d10</button>
+        <button class="btn-dado" onclick="lanzarDado(12)">d12</button>
+        <button class="btn-dado" onclick="lanzarDado(20)">d20</button>
+        <button class="btn-dado" onclick="lanzarDado(100)">d100</button>
+    </footer>
+
+    <audio id="audio-ambiente-dm" loop></audio>
+ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+      const supabaseUrl = 'https://kbaxoysuotwwrolybenw.supabase.co';
+      const supabaseKey = 'sb_publishable_ethKeei2lOPZUEXpkWr8bQ_DcbplFdt';
+      const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+      const canalVTT = supabaseClient.channel('sala-partida');
+    </script>
+
+    <script src="dm.js"></script>
+</body>
+</html>
