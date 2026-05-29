@@ -297,35 +297,6 @@ async function procesarColaDados() {
 
 inicializarProyeccionOnline();
 
-function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
-    let cl = `forma-d${caras}`;
-    boxDados.classList.add('mostrar');
-
-    arenaDados.innerHTML =
-        `<div class="contenedor-dado-animado">
-            <div class="dado-visual ${cl} rodando" style="width:75px;height:75px;font-size:1.8rem;">?</div>
-        </div>`;
-
-    setTimeout(() => {
-        let color = "white";
-        if (caras === 20 && base === 20) color = "gold";
-        if (caras === 20 && base === 1) color = "red";
-
-        let sub = mod !== 0 ? `<br><span style="font-size:0.85rem;color:#aaa;">(${base} ${mod >= 0 ? '+' : ''}${mod})</span>` : '';
-
-        arenaDados.innerHTML =
-            `<div class="contenedor-dado-animado">
-                <div class="dado-visual ${cl}" style="width:75px;height:75px;font-size:2.2rem;color:${color};">${total}</div>
-                <p style="color:#2ecc71;font-size:1.1rem;margin:6px 0 2px 0;font-weight:bold;text-align:center;">${quien}</p>
-                <p style="color:white;font-size:0.8rem;margin:0;text-align:center;">${motivo}${sub}</p>
-            </div>`;
-
-        clearTimeout(temporizadorDado);
-        temporizadorDado = setTimeout(() => {
-            boxDados.classList.remove('mostrar');
-        }, 3500);
-    }, 600);
-}
 
 function renderizarTokens(tokens) {
     document.querySelectorAll('.token-jugador').forEach(t => t.remove());
