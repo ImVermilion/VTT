@@ -1,20 +1,22 @@
+// --- LIMPIEZA DE INTERFAZ (Elimina los inputs de archivos del PC) ---
+document.querySelectorAll('input[type="file"]').forEach(el => {
+    el.style.display = 'none'; // Los ocultamos de la vista
+});
+
 function cambiarVista(idVista) {
     document.querySelectorAll('.dm-vista').forEach(v => v.classList.remove('activa'));
     document.getElementById(idVista).classList.add('activa');
 }
 
-// Bloquear interacciones con inputs de tipo file (evita que se abra la ventana del PC)
-document.querySelectorAll('input[type="file"]').forEach(input => {
-    input.addEventListener('click', function(e) {
-        e.preventDefault();
-        alert("Las imágenes/audios deben estar subidas en GitHub. Usa el botón de Guardar o Cargar de al lado para escribir su nombre.");
-    });
-});
-
+// Sincronización Doble: Base de Datos + Directo (Broadcast)
 async function actualizarEstadoVTT(payload) {
     if (typeof supabaseClient !== 'undefined') {
         const { error } = await supabaseClient.from('vtt_estado').update(payload).eq('id', 1);
         if (error) console.error("Error al sincronizar con Supabase:", error);
+    }
+    if (typeof canalVTT !== 'undefined') {
+        // Enviar por broadcast para que los jugadores lo vean al instante
+        canalVTT.send({ type: 'broadcast', event: 'estado-vtt', payload: payload });
     }
 }
 
@@ -80,8 +82,8 @@ if (document.getElementById('btn-toggle-rejilla')) {
 if (document.getElementById('btn-enviar-mapa')) {
     document.getElementById('btn-enviar-mapa').addEventListener('click', function() {
         if (mapaEnMemoria) {
-            actualizarEstadoVTT({ mapa_url: mapaEnMemoria, rejilla: estadoRejilla });
-            sincronizarTokensJugadores();
+            // Mandamos todo junto para que el jugador tenga el contexto completo
+            actualizarEstadoVTT({ mapa_url: mapaEnMemoria, rejilla: estadoRejilla, tokens: tokensEnMapa });
             alert("¡Tablero proyectado a los jugadores!");
         }
     });
@@ -145,15 +147,9 @@ function sincronizarTokensJugadores() { actualizarEstadoVTT({ tokens: tokensEnMa
 // --- AUDIO Y MÚSICA (Archivos de GitHub) ---
 let audioEnMemoria = null; const audioDM = document.getElementById('audio-ambiente-dm');
 
-// Botón de carga genérico, ya que hemos bloqueado el "input-audio" arriba
-const btnCargarAudio = document.getElementById('btn-play-audio').parentElement; // Tomamos el contenedor por si acaso
-btnCargarAudio.addEventListener('contextmenu', function(e) {
-    // Si necesitas un botón explícito, es mejor crear uno, pero con esto interceptamos un clic derecho por si acaso
-});
-
-// Para facilitar la carga de audio sin input type file:
+// Creamos un botón limpio para la música y lo inyectamos
 const btnAudioDirecto = document.createElement('button');
-btnAudioDirecto.innerText = "🎵 Seleccionar Pista GitHub";
+btnAudioDirecto.innerText = "🎵 Añadir Pista desde GitHub";
 btnAudioDirecto.className = "btn-dado";
 btnAudioDirecto.style.marginBottom = "10px";
 btnAudioDirecto.onclick = function() {
@@ -162,7 +158,7 @@ btnAudioDirecto.onclick = function() {
     audioEnMemoria = `assets/musica/${nombreArchivo}`;
     document.getElementById('status-audio').innerText = "Audio listo: " + nombreArchivo;
 };
-// Lo insertamos encima de los controles de audio
+
 if (document.getElementById('status-audio')) {
     document.getElementById('status-audio').parentNode.insertBefore(btnAudioDirecto, document.getElementById('status-audio'));
 }
@@ -174,7 +170,8 @@ document.getElementById('btn-play-audio').addEventListener('click', async functi
         await audioDM.play();
         actualizarEstadoVTT({ audio_url: audioEnMemoria });
         if (typeof canalVTT !== 'undefined') {
-            canalVTT.send({ type: 'broadcast', event: 'audio-comando', payload: { cmd: 'play' } });
+            // Mandamos la URL en el propio comando para evitar esperas
+            canalVTT.send({ type: 'broadcast', event: 'audio-comando', payload: { cmd: 'play', url: audioEnMemoria } });
         }
         document.getElementById('status-audio').innerText = "Reproduciendo";
     } catch(err) {
@@ -209,7 +206,6 @@ function reproducirSonidoDado() {
     }
 }
 
-// Lógica unificada para mostrar dados y registrar historial para el DM
 function mostrarDadoDM(quien, caras, base, total, motivo) {
     cambiarVista('vista-dados'); 
     reproducirSonidoDado();
@@ -233,7 +229,6 @@ function mostrarDadoDM(quien, caras, base, total, motivo) {
     
     arena.appendChild(dadoDiv);
 
-    // Crear/Usar Historial DM Automático
     let hist = document.getElementById('historial-tiradas-dm');
     if (!hist) {
         hist = document.createElement('div');
@@ -267,7 +262,6 @@ function lanzarDado(caras) {
     mostrarDadoDM(pkt.quien, pkt.caras, pkt.resultado, pkt.total, pkt.motivo);
 }
 
-// ESCUCHAR DADOS JUGADORES (Supabase Realtime)
 if (typeof canalVTT !== 'undefined') {
     canalVTT.on('broadcast', { event: 'dado-jugador' }, (mensaje) => {
         const info = mensaje.payload;
