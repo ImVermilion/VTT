@@ -5,6 +5,8 @@ const boxDados = document.getElementById('notificacion-dados-3d');
 const arenaDados = document.getElementById('arena-3d-jugadores');
 const elementoAudio = document.getElementById('audio-ambiente-vtt');
 
+let temporizadorDado;
+
 // --- GESTIÓN VISTAS JUGADOR ---
 function cambiarTabJugador(idTab, btn) {
     document.querySelectorAll('.player-vista').forEach(p => p.classList.remove('activa'));
@@ -86,10 +88,8 @@ function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
     let sub = mod !== 0 ? `<br><span style="font-size:0.85rem;color:#aaa;">(${base} ${mod >= 0 ? '+' : ''}${mod})</span>` : '';
 
     const dadoDiv = document.createElement('div');
-    // Aquí el contenedor NO lleva "rodando", solo la estructura base
     dadoDiv.className = 'contenedor-dado-animado';
     
-    // Aquí el innerHTML SÍ lleva "rodando" exclusivamente en la caja de la forma del dado
     dadoDiv.innerHTML = `
         <div class="dado-visual ${cl} rodando" style="width:75px;height:75px;font-size:2.2rem;color:${color}; margin: 0 auto;">${total}</div>
         <p style="color:#2ecc71;font-size:1.1rem;margin:6px 0 2px 0;font-weight:bold;text-align:center;">${quien}</p>
@@ -99,7 +99,6 @@ function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
     arenaDados.appendChild(dadoDiv);
     boxDados.classList.add('mostrar');
 
-    // Historial
     const hist = document.getElementById('historial-tiradas');
     if (hist) {
         const item = document.createElement('div');
@@ -121,13 +120,20 @@ function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
 async function inicializarProyeccionOnline() {
     if (typeof supabaseClient === 'undefined') return;
 
+    // Carga inicial
     let resultadoDB = await supabaseClient.from('vtt_estado').select('*').eq('id', 1).single();
     if (resultadoDB.data) aplicarEstadoVTT(resultadoDB.data);
 
+    // Escuchar la Base de Datos (Seguridad de respaldo)
     supabaseClient.channel('cambios-db')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vtt_estado' }, payload => {
             aplicarEstadoVTT(payload.new);
         }).subscribe();
+
+    // Escuchar Broadcast Directo (Más rápido, evita parpadeos)
+    canalVTT.on('broadcast', { event: 'estado-vtt' }, (mensaje) => {
+        aplicarEstadoVTT(mensaje.payload);
+    }).subscribe();
 
     canalVTT.on('broadcast', { event: 'dado-dm' }, (mensaje) => {
         mostrarDadoFlotante("Dungeon Master", mensaje.payload.caras, mensaje.payload.resultado, 0, "Tirada DM", mensaje.payload.total);
@@ -142,23 +148,31 @@ async function inicializarProyeccionOnline() {
     
     canalVTT.on('broadcast', { event: 'audio-comando' }, (mensaje) => {
         if(elementoAudio) {
-            if (mensaje.payload.cmd === 'play') elementoAudio.play().catch(()=>{});
+            if (mensaje.payload.cmd === 'play') {
+                if (mensaje.payload.url && !elementoAudio.src.endsWith(mensaje.payload.url)) {
+                    elementoAudio.src = mensaje.payload.url;
+                }
+                elementoAudio.play().catch(()=>{});
+            }
             if (mensaje.payload.cmd === 'pause') elementoAudio.pause();
         }
     }).subscribe();
 }
 
 function aplicarEstadoVTT(estado) {
-    if (estado.mapa_url) { imgMapa.src = estado.mapa_url; wrapperMapa.style.display = "inline-block"; }
-    else { imgMapa.src = ""; wrapperMapa.style.display = "none"; }
-    
-    if (estado.rejilla !== undefined && capaRejilla) capaRejilla.style.display = estado.rejilla ? 'block' : 'none';
-    if (estado.tokens) renderizarTokens(estado.tokens);
-
-    if (estado.audio_url && elementoAudio && !elementoAudio.src.endsWith(estado.audio_url)) {
-        elementoAudio.src = estado.audio_url;
+    // Solución al bug: Comprobamos si la clave existe antes de intentar aplicarla o borrarla
+    if ('mapa_url' in estado) {
+        if (estado.mapa_url) { imgMapa.src = estado.mapa_url; wrapperMapa.style.display = "inline-block"; }
+        else { imgMapa.src = ""; wrapperMapa.style.display = "none"; }
     }
-    if (estado.audio_volumen !== undefined && elementoAudio) {
+    
+    if ('rejilla' in estado && capaRejilla) capaRejilla.style.display = estado.rejilla ? 'block' : 'none';
+    if ('tokens' in estado) renderizarTokens(estado.tokens);
+
+    if ('audio_url' in estado && elementoAudio && estado.audio_url) {
+        if (!elementoAudio.src.endsWith(estado.audio_url)) elementoAudio.src = estado.audio_url;
+    }
+    if ('audio_volumen' in estado && elementoAudio) {
         elementoAudio.volume = estado.audio_volumen;
     }
 }
