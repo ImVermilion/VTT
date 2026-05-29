@@ -27,6 +27,26 @@
             <button onclick="cambiarVista('vista-editor')">📝 Wiki</button>
             <button onclick="cambiarVista('vista-fichas')">👥 Fichas</button>
             <button onclick="cambiarVista('vista-dados')">🎲 Arena</button>
+            <button onclick="exportarCampañaCompleta()"
+style="background:#9b59b6;color:white;">
+📦 Exportar Campaña
+</button>
+
+<label style="
+background:#e67e22;
+color:white;
+padding:5px 10px;
+cursor:pointer;
+border-radius:4px;
+">
+📥 Importar Campaña
+<input
+type="file"
+id="importar-campaña"
+accept=".json"
+style="display:none;"
+onchange="importarCampañaCompleta(this.files[0])">
+</label>
         </nav>
 
         <div id="vista-mapa-dm" class="dm-vista activa">
