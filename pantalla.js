@@ -106,23 +106,12 @@ async function inicializarProyeccionOnline() {
         return;
     }
 
-    
-    let { data, error } = await supabaseClient.from('vtt_estado').select('*').eq('id', 1).single();
-    if (data) aplicarEstadoVTT(data);
-
-    
-    supabaseClient.channel('cambios-db')
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vtt_estado' }, payload => {
-            aplicarEstadoVTT(payload.new);
-        })
-        .subscribe();
-
-    // 1. Cargar el estado inicial de la base de datos
-    let { data, error } = await supabase.from('vtt_estado').select('*').eq('id', 1).single();
-    if (data) aplicarEstadoVTT(data);
+    // 1. Cargar el estado inicial (Usamos 'respuestaDB' en vez de 'data' para evitar el error)
+    let respuestaDB = await supabaseClient.from('vtt_estado').select('*').eq('id', 1).single();
+    if (respuestaDB.data) aplicarEstadoVTT(respuestaDB.data);
 
     // 2. Escuchar cambios de la base de datos en tiempo real (Movimientos, Mapas...)
-    supabase.channel('cambios-db')
+    supabaseClient.channel('cambios-db')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vtt_estado' }, payload => {
             aplicarEstadoVTT(payload.new);
         })
@@ -136,7 +125,7 @@ async function inicializarProyeccionOnline() {
 
     canalVTT.on('broadcast', { event: 'dado-jugador' }, (mensaje) => {
         const info = mensaje.payload;
-        // Solo lo mostramos si es de OTRO jugador (porque si somos nosotros, ya lo pintamos al hacer clic)
+        // Solo lo mostramos si es de OTRO jugador
         if (info.quien !== (document.getElementById('nombre-jugador').value || "Jugador")) {
             mostrarDadoFlotante(info.quien, info.caras, info.resultado, info.mod, info.motivo, info.total);
         }
