@@ -129,23 +129,71 @@ async function inicializarProyeccionOnline() {
 }
 
 function aplicarEstadoVTT(estado) {
-    if (estado.mapa_url) { imgMapa.src = estado.mapa_url; wrapperMapa.style.display = "inline-block"; }
-    if (estado.rejilla !== undefined) capaRejilla.style.display = estado.rejilla ? 'block' : 'none';
-    if (estado.tokens) renderizarTokens(estado.tokens);
+
+    if (estado.mapa_url) {
+        imgMapa.src = estado.mapa_url;
+        wrapperMapa.style.display = "inline-block";
+    }
+
+    if (estado.rejilla !== undefined) {
+        capaRejilla.style.display =
+            estado.rejilla ? 'block' : 'none';
+    }
+
+    if (estado.tokens) {
+        renderizarTokens(estado.tokens);
+    }
+
+    // AUDIO GLOBAL
+    if (estado.audio_url) {
+
+        if (elementoAudio.src !== estado.audio_url) {
+
+            elementoAudio.src = estado.audio_url;
+
+            elementoAudio.volume =
+                estado.audio_volumen || 0.5;
+
+            elementoAudio.play().catch(() => {});
+        }
+    }
 }
 
-function procesarTiradaJugador(caras, mod, motivo) {
-    const total = Math.floor(Math.random() * caras) + 1 + mod;
-    const nick = document.getElementById('nombre-jugador').value || "Jugador";
-    canalVTT.send({ type: 'broadcast', event: 'dado-jugador', payload: { quien: nick, total: total, mod: mod, motivo: motivo } });
-    mostrarDadoFlotante(nick, caras, total - mod, mod, motivo, total);
-}
 
-function tirarDadoGenericoJugador(caras) { procesarTiradaJugador(caras, 0, "d" + caras); }
 
 function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
     boxDados.classList.add('mostrar');
-    arenaDados.innerHTML = `<div class="dado-visual" style="font-size:2rem;">${total}</div><p>${quien} - ${motivo}</p>`;
+    arenaDados.innerHTML =
+`
+<div class="contenedor-dado-animado">
+    <div class="dado-visual ${cl}"
+        style="
+            width:75px;
+            height:75px;
+            font-size:2rem;
+            color:${color};
+        ">
+        ${total}
+    </div>
+
+    <p style="
+        color:#2ecc71;
+        font-weight:bold;
+        margin-top:6px;
+        text-align:center;
+    ">
+        ${quien}
+    </p>
+
+    <p style="
+        color:#aaa;
+        font-size:0.8rem;
+        text-align:center;
+    ">
+        ${motivo}
+    </p>
+</div>
+`;
     clearTimeout(temporizadorDado);
     temporizadorDado = setTimeout(() => boxDados.classList.remove('mostrar'), 3500);
 }
