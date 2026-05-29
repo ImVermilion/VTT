@@ -234,25 +234,133 @@ function reproducirSonidoDado() {
     }
 }
 
-function lanzarDado(caras) {
-    cambiarVista('vista-dados'); reproducirSonidoDado();
-    const arena = document.getElementById('arena-3d'); const resultado = Math.floor(Math.random() * caras) + 1; let c = `forma-d${caras}`;
-    arena.innerHTML = `<div class="contenedor-dado-animado"><div class="dado-visual ${c} rodando" style="width:120px;height:120px;font-size:3rem;">?</div></div>`;
-    
-    // Broadcast Supabase
-    if (typeof canalVTT !== 'undefined') {
-        canalVTT.send({
-            type: 'broadcast',
-            event: 'dado-dm',
-            payload: { caras: caras, resultado: resultado, tiempo: Date.now() }
-        });
+const colaDados = [];
+let procesandoDado = false;
+
+function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
+
+    colaDados.push({
+        quien,
+        caras,
+        base,
+        mod,
+        motivo,
+        total
+    });
+
+    if (!procesandoDado) {
+        procesarColaDados();
+    }
+}
+
+async function procesarColaDados() {
+
+    if (colaDados.length === 0) {
+        procesandoDado = false;
+        return;
+    }
+
+    procesandoDado = true;
+
+    const dado = colaDados.shift();
+
+    let cl = `forma-d${dado.caras}`;
+
+    let color = "white";
+
+    if (dado.caras === 20 && dado.base === 20)
+        color = "gold";
+
+    if (dado.caras === 20 && dado.base === 1)
+        color = "red";
+
+    const div = document.createElement('div');
+
+    div.className = 'dado-historial';
+
+    div.innerHTML = `
+        <div class="contenedor-dado-animado">
+
+            <div class="dado-visual ${cl} rodando"
+                style="
+                    width:75px;
+                    height:75px;
+                    font-size:2rem;
+                ">
+                ?
+            </div>
+
+        </div>
+    `;
+
+    arenaDados.prepend(div);
+
+    boxDados.classList.add('mostrar');
+
+    await new Promise(r => setTimeout(r, 600));
+
+    let sub =
+        dado.mod !== 0
+        ? `<br><span style="font-size:0.85rem;color:#aaa;">
+            (${dado.base} ${dado.mod >= 0 ? '+' : ''}${dado.mod})
+           </span>`
+        : '';
+
+    div.innerHTML = `
+        <div class="contenedor-dado-animado">
+
+            <div class="dado-visual ${cl}"
+                style="
+                    width:75px;
+                    height:75px;
+                    font-size:2rem;
+                    color:${color};
+                ">
+                ${dado.total}
+            </div>
+
+            <p style="
+                color:#2ecc71;
+                font-weight:bold;
+                text-align:center;
+                margin:5px 0;
+            ">
+                ${dado.quien}
+            </p>
+
+            <p style="
+                color:#ccc;
+                font-size:0.8rem;
+                text-align:center;
+            ">
+                ${dado.motivo}
+                ${sub}
+            </p>
+
+        </div>
+    `;
+
+    while (arenaDados.children.length > 8) {
+        arenaDados.removeChild(arenaDados.lastChild);
     }
 
     setTimeout(() => {
-        arena.innerHTML = `<div class="contenedor-dado-animado"><div class="dado-visual ${c}" style="width:120px;height:120px;font-size:3rem;color: ${resultado === caras && caras === 20 ? '#ffd700' : 'white'};">${resultado}</div><p style="color:#aaa;">d${caras}</p></div>`;
-    }, 600);
-}
+        div.style.opacity = '0.3';
+    }, 5000);
 
+    setTimeout(() => {
+        div.remove();
+
+        if (arenaDados.children.length === 0) {
+            boxDados.classList.remove('mostrar');
+        }
+
+    }, 12000);
+
+    setTimeout(() => {
+        procesarColaDados();
+    }, 1200);
+}
 // ESCUCHAR DADOS JUGADORES (Supabase Realtime)
 if (typeof canalVTT !== 'undefined') {
     canalVTT.on('broadcast', { event: 'dado-jugador' }, (mensaje) => {
