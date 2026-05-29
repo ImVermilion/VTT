@@ -3,88 +3,61 @@ function cambiarVista(idVista) {
     document.getElementById(idVista).classList.add('activa');
 }
 
-// --- UTILIDAD SUPABASE ---
-async function subirArchivoSupabase(file, bucket) {
-    const nombre = `${Date.now()}-${file.name}`;
+// Bloquear interacciones con inputs de tipo file (evita que se abra la ventana del PC)
+document.querySelectorAll('input[type="file"]').forEach(input => {
+    input.addEventListener('click', function(e) {
+        e.preventDefault();
+        alert("Las imágenes/audios deben estar subidas en GitHub. Usa el botón de Guardar o Cargar de al lado para escribir su nombre.");
+    });
+});
 
-    const { data, error } = await supabaseClient
-        .storage
-        .from(bucket)
-        .upload(nombre, file);
-
-    if (error) {
-        console.error(error);
-        alert("Error subiendo archivo");
-        return null;
-    }
-
-    const { data: urlData } = supabaseClient
-        .storage
-        .from(bucket)
-        .getPublicUrl(nombre);
-
-    return urlData.publicUrl;
-}
-// Función para actualizar la tabla de estado en la nube
 async function actualizarEstadoVTT(payload) {
     if (typeof supabaseClient !== 'undefined') {
-        // Usamos supabaseClient en lugar de supabase
         const { error } = await supabaseClient.from('vtt_estado').update(payload).eq('id', 1);
         if (error) console.error("Error al sincronizar con Supabase:", error);
-    } else {
-        console.warn("Supabase no está inicializado.");
     }
 }
 
-// --- MAPAS, TOKENS Y GALERÍA ---
+// --- MAPAS, TOKENS Y GALERÍA (Archivos de GitHub) ---
 let galeriaMapas = JSON.parse(localStorage.getItem('galeriaMapas')) || [];
 let galeriaTokens = JSON.parse(localStorage.getItem('galeriaTokens')) || [];
 let mapaEnMemoria = null; let estadoRejilla = false; let tokensEnMapa = []; 
 const wrapperMapa = document.getElementById('wrapper-mapa'); let tokenActivoID = null;
 
-document.getElementById('btn-guardar-galeria').addEventListener('click', async function() {
-
-    const archivoInput = document.getElementById('input-archivo');
+document.getElementById('btn-guardar-galeria').addEventListener('click', function(e) {
+    e.preventDefault();
     const tipo = document.getElementById('tipo-archivo').value;
+    const nombreArchivo = prompt(`Escribe el nombre del archivo en la carpeta assets/${tipo === 'mapa' ? 'mapas' : 'tokens'}/ de tu GitHub (ej. cueva.jpg):`);
+    
+    if (!nombreArchivo) return;
 
-    if (!archivoInput.files[0]) return;
-
-    const file = archivoInput.files[0];
-
-    let bucket = tipo === 'mapa'
-        ? 'mapas'
-        : 'tokens';
-
-    const url = await subirArchivoSupabase(file, bucket);
-
-    if (!url) return;
+    const urlGithub = `assets/${tipo === 'mapa' ? 'mapas' : 'tokens'}/${nombreArchivo}`;
 
     if (tipo === 'mapa') {
-        galeriaMapas.push(url);
+        galeriaMapas.push(urlGithub);
         localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas));
     } else {
-        galeriaTokens.push(url);
+        galeriaTokens.push(urlGithub);
         localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens));
     }
 
     renderizarGalerias();
-    archivoInput.value = "";
 });
 
 function renderizarGalerias() {
     document.getElementById('galeria-mapas').innerHTML = ''; document.getElementById('galeria-tokens').innerHTML = '';
-    galeriaMapas.forEach(imgBase64 => {
-        const img = document.createElement('div'); img.className = 'item-galeria'; img.style.backgroundImage = `url(${imgBase64})`;
-        img.onclick = () => cargarMapaEnTablero(imgBase64); document.getElementById('galeria-mapas').appendChild(img);
+    galeriaMapas.forEach(url => {
+        const img = document.createElement('div'); img.className = 'item-galeria'; img.style.backgroundImage = `url(${url})`;
+        img.onclick = () => cargarMapaEnTablero(url); document.getElementById('galeria-mapas').appendChild(img);
     });
-    galeriaTokens.forEach(imgBase64 => {
-        const img = document.createElement('div'); img.className = 'item-galeria'; img.style.backgroundImage = `url(${imgBase64})`;
-        img.onclick = () => crearToken(imgBase64); document.getElementById('galeria-tokens').appendChild(img);
+    galeriaTokens.forEach(url => {
+        const img = document.createElement('div'); img.className = 'item-galeria'; img.style.backgroundImage = `url(${url})`;
+        img.onclick = () => crearToken(url); document.getElementById('galeria-tokens').appendChild(img);
     });
 }
 
-function cargarMapaEnTablero(imgBase64) {
-    mapaEnMemoria = imgBase64; document.getElementById('img-mapa').src = imgBase64;
+function cargarMapaEnTablero(url) {
+    mapaEnMemoria = url; document.getElementById('img-mapa').src = url;
     wrapperMapa.style.display = "inline-block"; cambiarVista('vista-mapa-dm');
 }
 
@@ -92,36 +65,35 @@ function vaciarTablero() {
     if(confirm("¿Vaciar el tablero?")) {
         mapaEnMemoria = null; document.getElementById('img-mapa').src = ""; wrapperMapa.style.display = "none";
         tokensEnMapa = []; document.querySelectorAll('.token-dm').forEach(t => t.remove());
-        
-        // Sincronización Supabase
         actualizarEstadoVTT({ mapa_url: null, tokens: [] });
     }
 }
 
-document.getElementById('btn-toggle-rejilla').addEventListener('click', () => {
-    estadoRejilla = !estadoRejilla; const capa = document.getElementById('capa-rejilla');
-    if(estadoRejilla) capa.classList.add('activa'); else capa.classList.remove('activa');
-    
-    // Sincronización Supabase
-    actualizarEstadoVTT({ rejilla: estadoRejilla });
-});
+if (document.getElementById('btn-toggle-rejilla')) {
+    document.getElementById('btn-toggle-rejilla').addEventListener('click', () => {
+        estadoRejilla = !estadoRejilla; const capa = document.getElementById('capa-rejilla');
+        if(estadoRejilla) capa.classList.add('activa'); else capa.classList.remove('activa');
+        actualizarEstadoVTT({ rejilla: estadoRejilla });
+    });
+}
 
-document.getElementById('btn-enviar-mapa').addEventListener('click', function() {
-    if (mapaEnMemoria) {
-        // Sincronización Supabase
-        actualizarEstadoVTT({ mapa_url: mapaEnMemoria, rejilla: estadoRejilla });
-        sincronizarTokensJugadores();
-        alert("¡Tablero proyectado a los jugadores!");
-    }
-});
+if (document.getElementById('btn-enviar-mapa')) {
+    document.getElementById('btn-enviar-mapa').addEventListener('click', function() {
+        if (mapaEnMemoria) {
+            actualizarEstadoVTT({ mapa_url: mapaEnMemoria, rejilla: estadoRejilla });
+            sincronizarTokensJugadores();
+            alert("¡Tablero proyectado a los jugadores!");
+        }
+    });
+}
 
-function crearToken(imagenBase64) {
+function crearToken(url) {
     if(!mapaEnMemoria) return; cambiarVista('vista-mapa-dm'); 
     const idToken = 'token_' + Date.now();
-    const tokenData = { id: idToken, img: imagenBase64, x: '50%', y: '50%', visible: false, escala: 50, color: '#e74c3c' };
+    const tokenData = { id: idToken, img: url, x: '50%', y: '50%', visible: false, escala: 50, color: '#e74c3c' };
     tokensEnMapa.push(tokenData);
     const tokenEl = document.createElement('div'); tokenEl.className = 'token-dm token-oculto'; tokenEl.id = idToken;
-    tokenEl.style.backgroundImage = `url(${imagenBase64})`; tokenEl.style.left = tokenData.x; tokenEl.style.top = tokenData.y;
+    tokenEl.style.backgroundImage = `url(${url})`; tokenEl.style.left = tokenData.x; tokenEl.style.top = tokenData.y;
     wrapperMapa.appendChild(tokenEl); actualizarVisualToken(idToken); sincronizarTokensJugadores();
 
     let isDragging = false;
@@ -168,35 +140,38 @@ function actualizarVisualToken(id) {
     }
 }
 
-// Sincronización Supabase
-function sincronizarTokensJugadores() { 
-    actualizarEstadoVTT({ tokens: tokensEnMapa }); 
-}
+function sincronizarTokensJugadores() { actualizarEstadoVTT({ tokens: tokensEnMapa }); }
 
-// --- AUDIO Y MÚSICA ---
+// --- AUDIO Y MÚSICA (Archivos de GitHub) ---
 let audioEnMemoria = null; const audioDM = document.getElementById('audio-ambiente-dm');
-document.getElementById('input-audio').addEventListener('change', async function(e) {
 
-    const archivo = e.target.files[0];
-
-    if (!archivo) return;
-
-    const url = await subirArchivoSupabase(archivo, 'audio');
-
-    if (!url) return;
-
-    audioEnMemoria = url;
-
-    document.getElementById('status-audio').innerText =
-        "Audio cargado";
+// Botón de carga genérico, ya que hemos bloqueado el "input-audio" arriba
+const btnCargarAudio = document.getElementById('btn-play-audio').parentElement; // Tomamos el contenedor por si acaso
+btnCargarAudio.addEventListener('contextmenu', function(e) {
+    // Si necesitas un botón explícito, es mejor crear uno, pero con esto interceptamos un clic derecho por si acaso
 });
+
+// Para facilitar la carga de audio sin input type file:
+const btnAudioDirecto = document.createElement('button');
+btnAudioDirecto.innerText = "🎵 Seleccionar Pista GitHub";
+btnAudioDirecto.className = "btn-dado";
+btnAudioDirecto.style.marginBottom = "10px";
+btnAudioDirecto.onclick = function() {
+    const nombreArchivo = prompt(`Escribe el nombre del audio en la carpeta assets/musica/ de tu GitHub (ej. taberna.mp3):`);
+    if (!nombreArchivo) return;
+    audioEnMemoria = `assets/musica/${nombreArchivo}`;
+    document.getElementById('status-audio').innerText = "Audio listo: " + nombreArchivo;
+};
+// Lo insertamos encima de los controles de audio
+if (document.getElementById('status-audio')) {
+    document.getElementById('status-audio').parentNode.insertBefore(btnAudioDirecto, document.getElementById('status-audio'));
+}
 
 document.getElementById('btn-play-audio').addEventListener('click', async function() {
     if (!audioEnMemoria) return;
     audioDM.src = audioEnMemoria;
     try {
         await audioDM.play();
-        // Sincronización Supabase: Guardar el audio y enviar comando de play
         actualizarEstadoVTT({ audio_url: audioEnMemoria });
         if (typeof canalVTT !== 'undefined') {
             canalVTT.send({ type: 'broadcast', event: 'audio-comando', payload: { cmd: 'play' } });
@@ -220,7 +195,7 @@ document.getElementById('volume-audio').addEventListener('input', function(e) {
     actualizarEstadoVTT({ audio_volumen: e.target.value });
 });
 
-// --- DADOS Y WIKI ---
+// --- DADOS, HISTORIAL Y WIKI (DM) ---
 function reproducirSonidoDado() {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     for (let i = 0; i < 4; i++) {
@@ -234,40 +209,73 @@ function reproducirSonidoDado() {
     }
 }
 
-function lanzarDado(caras) {
-    cambiarVista('vista-dados'); reproducirSonidoDado();
-    const arena = document.getElementById('arena-3d'); const resultado = Math.floor(Math.random() * caras) + 1; let c = `forma-d${caras}`;
-    arena.innerHTML = `<div class="contenedor-dado-animado"><div class="dado-visual ${c} rodando" style="width:120px;height:120px;font-size:3rem;">?</div></div>`;
+// Lógica unificada para mostrar dados y registrar historial para el DM
+function mostrarDadoDM(quien, caras, base, total, motivo) {
+    cambiarVista('vista-dados'); 
+    reproducirSonidoDado();
     
-    // Broadcast Supabase
-    if (typeof canalVTT !== 'undefined') {
-        canalVTT.send({
-            type: 'broadcast',
-            event: 'dado-dm',
-            payload: { caras: caras, resultado: resultado, tiempo: Date.now() }
-        });
-    }
+    const arena = document.getElementById('arena-3d');
+    const numCaras = parseInt(caras);
+    let cl = 'forma-d' + numCaras;
+    if (!numCaras || isNaN(numCaras)) cl = 'forma-d6';
 
-    setTimeout(() => {
-        arena.innerHTML = `<div class="contenedor-dado-animado"><div class="dado-visual ${c}" style="width:120px;height:120px;font-size:3rem;color: ${resultado === caras && caras === 20 ? '#ffd700' : 'white'};">${resultado}</div><p style="color:#aaa;">d${caras}</p></div>`;
-    }, 600);
+    let color = "white";
+    if (numCaras === 20 && base === 20) color = "gold";
+    if (numCaras === 20 && base === 1) color = "red";
+
+    const dadoDiv = document.createElement('div');
+    dadoDiv.className = 'contenedor-dado-animado';
+    dadoDiv.innerHTML = `
+        <div class="dado-visual ${cl} rodando" style="width:100px;height:100px;font-size:2.5rem;color:${color}; margin: 0 auto;">${total}</div>
+        <p style="color:#2ecc71; font-size:1.2rem; font-weight:bold; margin:10px 0 5px 0; text-align:center;">${quien}</p>
+        <p style="color:#aaa; font-size:0.9rem; margin:0; text-align:center;">${motivo}</p>
+    `;
+    
+    arena.appendChild(dadoDiv);
+
+    // Crear/Usar Historial DM Automático
+    let hist = document.getElementById('historial-tiradas-dm');
+    if (!hist) {
+        hist = document.createElement('div');
+        hist.id = 'historial-tiradas-dm';
+        hist.style.background = '#1e1e1e';
+        hist.style.border = '1px solid #333';
+        hist.style.padding = '10px';
+        hist.style.height = '300px';
+        hist.style.overflowY = 'auto';
+        hist.style.marginTop = '20px';
+        hist.style.width = '100%';
+        arena.parentElement.appendChild(hist);
+    }
+    
+    const item = document.createElement('div');
+    item.style.padding = '8px';
+    item.style.borderBottom = '1px solid #333';
+    item.innerHTML = `<strong style="color:#2ecc71">${quien}</strong> tiró d${numCaras} <i>(${motivo})</i>: <b style="color:#3498db; font-size:1.2em">${total}</b>`;
+    hist.prepend(item);
+
+    setTimeout(() => { dadoDiv.remove(); }, 4500);
+}
+
+function lanzarDado(caras) {
+    const base = Math.floor(Math.random() * caras) + 1;
+    const pkt = { quien: "Dungeon Master", caras: caras, resultado: base, mod: 0, total: base, motivo: `Tirada DM`, tiempo: Date.now() };
+    
+    if (typeof canalVTT !== 'undefined') {
+        canalVTT.send({ type: 'broadcast', event: 'dado-dm', payload: pkt });
+    }
+    mostrarDadoDM(pkt.quien, pkt.caras, pkt.resultado, pkt.total, pkt.motivo);
 }
 
 // ESCUCHAR DADOS JUGADORES (Supabase Realtime)
 if (typeof canalVTT !== 'undefined') {
     canalVTT.on('broadcast', { event: 'dado-jugador' }, (mensaje) => {
         const info = mensaje.payload;
-        cambiarVista('vista-dados'); reproducirSonidoDado();
-        const arena = document.getElementById('arena-3d'); let c = `forma-d${info.caras}`;
-        arena.innerHTML = `<div class="contenedor-dado-animado"><div class="dado-visual ${c} rodando" style="width:120px;height:120px;font-size:3rem;">?</div></div>`;
-        setTimeout(() => {
-            let color = "white"; if (info.caras === 20 && info.resultado === 20) color = "gold"; if (info.caras === 20 && info.resultado === 1) color = "red";
-            arena.innerHTML = `<div class="contenedor-dado-animado"><div class="dado-visual ${c}" style="width:120px;height:120px;font-size:3rem;color: ${color};">${info.total}</div><p style="color:#2ecc71; font-size:1.5rem; font-weight:bold; margin:5px 0;">${info.quien}</p><p style="color:#aaa;">${info.motivo}</p></div>`;
-        }, 600);
+        mostrarDadoDM(info.quien, info.caras, info.resultado, info.total, info.motivo);
     }).subscribe();
 }
 
-// WIKI Y FICHAS (Esto se queda local en el PC del DM)
+// WIKI Y FICHAS 
 let wikiDB = JSON.parse(localStorage.getItem('wikiDM')) || { "root": { id: "root", tipo: "carpeta", titulo: "Campaña", hijos: [] } };
 function guardarWiki() { localStorage.setItem('wikiDM', JSON.stringify(wikiDB)); renderizarWiki(); }
 function generarID() { return '_' + Math.random().toString(36).substr(2, 9); }
@@ -285,60 +293,21 @@ function construirArbolHTML(idElemento) {
     }
 }
 function exportarCampañaCompleta() {
-
-    const campaña = {
-
-        wikiDB,
-        fichasDB,
-        galeriaMapas,
-        galeriaTokens
-
-    };
-
-    const dataStr =
-        "data:text/json;charset=utf-8," +
-        encodeURIComponent(JSON.stringify(campaña));
-
-    const a = document.createElement('a');
-
-    a.href = dataStr;
-
-    a.download = "campaña_vtt.json";
-
-    a.click();
+    const campaña = { wikiDB, fichasDB, galeriaMapas, galeriaTokens };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(campaña));
+    const a = document.createElement('a'); a.href = dataStr; a.download = "campaña_vtt.json"; a.click();
 }
 function importarCampañaCompleta(file) {
-
     const reader = new FileReader();
-
     reader.onload = function(e) {
-
         try {
-
             const data = JSON.parse(e.target.result);
-
-            wikiDB = data.wikiDB || {};
-            fichasDB = data.fichasDB || {};
-            galeriaMapas = data.galeriaMapas || [];
-            galeriaTokens = data.galeriaTokens || [];
-
-            localStorage.setItem('wikiDM', JSON.stringify(wikiDB));
-            localStorage.setItem('fichasDM', JSON.stringify(fichasDB));
-            localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas));
-            localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens));
-
-            renderizarWiki();
-            renderizarFichasUI();
-            renderizarGalerias();
-
+            wikiDB = data.wikiDB || {}; fichasDB = data.fichasDB || {}; galeriaMapas = data.galeriaMapas || []; galeriaTokens = data.galeriaTokens || [];
+            localStorage.setItem('wikiDM', JSON.stringify(wikiDB)); localStorage.setItem('fichasDM', JSON.stringify(fichasDB)); localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas)); localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens));
+            renderizarWiki(); renderizarFichasUI(); renderizarGalerias();
             alert("Campaña importada");
-
-        } catch(err) {
-
-            alert("Archivo inválido");
-        }
+        } catch(err) { alert("Archivo inválido"); }
     };
-
     reader.readAsText(file);
 }
 function renderizarWiki() { document.getElementById('arbol-glosario').innerHTML = construirArbolHTML('root'); }
@@ -354,3 +323,4 @@ function guardarFichaActual() { if(!fichaActualID) return; const f = fichasDB[fi
 function exportarFichaSeleccionada() { if(!fichaActualID) return; const f = fichasDB[fichaActualID]; const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(f)); const a = document.createElement('a'); a.href = dataStr; a.download = `${f.nombre}_ficha.json`; a.click(); }
 
 renderizarWiki(); renderizarGalerias(); renderizarFichasUI();
+window.addEventListener('DOMContentLoaded', renderizarGalerias);
