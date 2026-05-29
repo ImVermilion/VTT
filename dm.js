@@ -4,27 +4,6 @@ function cambiarVista(idVista) {
 }
 
 // --- UTILIDAD SUPABASE ---
-async function subirArchivoSupabase(file, bucket) {
-    const nombre = `${Date.now()}-${file.name}`;
-
-    const { data, error } = await supabaseClient
-        .storage
-        .from(bucket)
-        .upload(nombre, file);
-
-    if (error) {
-        console.error(error);
-        alert("Error subiendo archivo");
-        return null;
-    }
-
-    const { data: urlData } = supabaseClient
-        .storage
-        .from(bucket)
-        .getPublicUrl(nombre);
-
-    return urlData.publicUrl;
-}
 // Función para actualizar la tabla de estado en la nube
 async function actualizarEstadoVTT(payload) {
     if (typeof supabaseClient !== 'undefined') {
@@ -42,33 +21,16 @@ let galeriaTokens = JSON.parse(localStorage.getItem('galeriaTokens')) || [];
 let mapaEnMemoria = null; let estadoRejilla = false; let tokensEnMapa = []; 
 const wrapperMapa = document.getElementById('wrapper-mapa'); let tokenActivoID = null;
 
-document.getElementById('btn-guardar-galeria').addEventListener('click', async function() {
-
+document.getElementById('btn-guardar-galeria').addEventListener('click', function() {
     const archivoInput = document.getElementById('input-archivo');
     const tipo = document.getElementById('tipo-archivo').value;
-
     if (!archivoInput.files[0]) return;
-
-    const file = archivoInput.files[0];
-
-    let bucket = tipo === 'mapa'
-        ? 'mapas'
-        : 'tokens';
-
-    const url = await subirArchivoSupabase(file, bucket);
-
-    if (!url) return;
-
-    if (tipo === 'mapa') {
-        galeriaMapas.push(url);
-        localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas));
-    } else {
-        galeriaTokens.push(url);
-        localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens));
-    }
-
-    renderizarGalerias();
-    archivoInput.value = "";
+    const lector = new FileReader();
+    lector.onload = function(e) {
+        if (tipo === 'mapa') { galeriaMapas.push(e.target.result); localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas)); } 
+        else { galeriaTokens.push(e.target.result); localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens)); }
+        renderizarGalerias(); archivoInput.value = ""; 
+    }; lector.readAsDataURL(archivoInput.files[0]);
 });
 
 function renderizarGalerias() {
@@ -175,20 +137,11 @@ function sincronizarTokensJugadores() {
 
 // --- AUDIO Y MÚSICA ---
 let audioEnMemoria = null; const audioDM = document.getElementById('audio-ambiente-dm');
-document.getElementById('input-audio').addEventListener('change', async function(e) {
-
-    const archivo = e.target.files[0];
-
-    if (!archivo) return;
-
-    const url = await subirArchivoSupabase(archivo, 'audio');
-
-    if (!url) return;
-
-    audioEnMemoria = url;
-
-    document.getElementById('status-audio').innerText =
-        "Audio cargado";
+document.getElementById('input-audio').addEventListener('change', function(e) {
+    const archivo = e.target.files[0]; if (!archivo) return;
+    const lector = new FileReader();
+    lector.onload = function(evt) { audioEnMemoria = evt.target.result; document.getElementById('status-audio').innerText = "Cargado: " + archivo.name; };
+    lector.readAsDataURL(archivo);
 });
 
 document.getElementById('btn-play-audio').addEventListener('click', async function() {
@@ -234,133 +187,25 @@ function reproducirSonidoDado() {
     }
 }
 
-const colaDados = [];
-let procesandoDado = false;
-
-function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
-
-    colaDados.push({
-        quien,
-        caras,
-        base,
-        mod,
-        motivo,
-        total
-    });
-
-    if (!procesandoDado) {
-        procesarColaDados();
+function lanzarDado(caras) {
+    cambiarVista('vista-dados'); reproducirSonidoDado();
+    const arena = document.getElementById('arena-3d'); const resultado = Math.floor(Math.random() * caras) + 1; let c = `forma-d${caras}`;
+    arena.innerHTML = `<div class="contenedor-dado-animado"><div class="dado-visual ${c} rodando" style="width:120px;height:120px;font-size:3rem;">?</div></div>`;
+    
+    // Broadcast Supabase
+    if (typeof canalVTT !== 'undefined') {
+        canalVTT.send({
+            type: 'broadcast',
+            event: 'dado-dm',
+            payload: { caras: caras, resultado: resultado, tiempo: Date.now() }
+        });
     }
+
+    setTimeout(() => {
+        arena.innerHTML = `<div class="contenedor-dado-animado"><div class="dado-visual ${c}" style="width:120px;height:120px;font-size:3rem;color: ${resultado === caras && caras === 20 ? '#ffd700' : 'white'};">${resultado}</div><p style="color:#aaa;">d${caras}</p></div>`;
+    }, 600);
 }
 
-async function procesarColaDados() {
-
-    if (colaDados.length === 0) {
-        procesandoDado = false;
-        return;
-    }
-
-    procesandoDado = true;
-
-    const dado = colaDados.shift();
-
-    let cl = `forma-d${dado.caras}`;
-
-    let color = "white";
-
-    if (dado.caras === 20 && dado.base === 20)
-        color = "gold";
-
-    if (dado.caras === 20 && dado.base === 1)
-        color = "red";
-
-    const div = document.createElement('div');
-
-    div.className = 'dado-historial';
-
-    div.innerHTML = `
-        <div class="contenedor-dado-animado">
-
-            <div class="dado-visual ${cl} rodando"
-                style="
-                    width:75px;
-                    height:75px;
-                    font-size:2rem;
-                ">
-                ?
-            </div>
-
-        </div>
-    `;
-
-    arenaDados.prepend(div);
-
-    boxDados.classList.add('mostrar');
-
-    await new Promise(r => setTimeout(r, 600));
-
-    let sub =
-        dado.mod !== 0
-        ? `<br><span style="font-size:0.85rem;color:#aaa;">
-            (${dado.base} ${dado.mod >= 0 ? '+' : ''}${dado.mod})
-           </span>`
-        : '';
-
-    div.innerHTML = `
-        <div class="contenedor-dado-animado">
-
-            <div class="dado-visual ${cl}"
-                style="
-                    width:75px;
-                    height:75px;
-                    font-size:2rem;
-                    color:${color};
-                ">
-                ${dado.total}
-            </div>
-
-            <p style="
-                color:#2ecc71;
-                font-weight:bold;
-                text-align:center;
-                margin:5px 0;
-            ">
-                ${dado.quien}
-            </p>
-
-            <p style="
-                color:#ccc;
-                font-size:0.8rem;
-                text-align:center;
-            ">
-                ${dado.motivo}
-                ${sub}
-            </p>
-
-        </div>
-    `;
-
-    while (arenaDados.children.length > 8) {
-        arenaDados.removeChild(arenaDados.lastChild);
-    }
-
-    setTimeout(() => {
-        div.style.opacity = '0.3';
-    }, 5000);
-
-    setTimeout(() => {
-        div.remove();
-
-        if (arenaDados.children.length === 0) {
-            boxDados.classList.remove('mostrar');
-        }
-
-    }, 12000);
-
-    setTimeout(() => {
-        procesarColaDados();
-    }, 1200);
-}
 // ESCUCHAR DADOS JUGADORES (Supabase Realtime)
 if (typeof canalVTT !== 'undefined') {
     canalVTT.on('broadcast', { event: 'dado-jugador' }, (mensaje) => {
@@ -392,85 +237,10 @@ function construirArbolHTML(idElemento) {
         html += `</ul>`; return `<li>${html}</li>`; 
     }
 }
-function exportarCampañaCompleta() {
-
-    const campaña = {
-
-        wikiDB,
-        fichasDB,
-        galeriaMapas,
-        galeriaTokens
-
-    };
-
-    const dataStr =
-        "data:text/json;charset=utf-8," +
-        encodeURIComponent(JSON.stringify(campaña));
-
-    const a = document.createElement('a');
-
-    a.href = dataStr;
-
-    a.download = "campaña_vtt.json";
-
-    a.click();
-}
-function importarCampañaCompleta(file) {
-
-    const reader = new FileReader();
-
-    reader.onload = function(e) {
-
-        try {
-
-            const data = JSON.parse(e.target.result);
-
-            wikiDB = data.wikiDB || {};
-            fichasDB = data.fichasDB || {};
-            galeriaMapas = data.galeriaMapas || [];
-            galeriaTokens = data.galeriaTokens || [];
-
-            localStorage.setItem('wikiDM', JSON.stringify(wikiDB));
-            localStorage.setItem('fichasDM', JSON.stringify(fichasDB));
-            localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas));
-            localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens));
-
-            renderizarWiki();
-            renderizarFichasUI();
-            renderizarGalerias();
-
-            alert("Campaña importada");
-
-        } catch(err) {
-
-            alert("Archivo inválido");
-        }
-    };
-
-    reader.readAsText(file);
-}
 function renderizarWiki() { document.getElementById('arbol-glosario').innerHTML = construirArbolHTML('root'); }
 function crearElemento(idPadre, tipo) { const titulo = prompt(`Nombre:`); if (titulo) { const nid = generarID(); wikiDB[nid] = { id: nid, tipo: tipo, titulo: titulo, padre: idPadre, hijos: tipo === 'carpeta' ? [] : undefined, contenido: "" }; wikiDB[idPadre].hijos.push(nid); guardarWiki(); } }
 function borrarElemento(id, idPadre) { if (confirm("¿Borrar?")) { wikiDB[idPadre].hijos = wikiDB[idPadre].hijos.filter(h => h !== id); delete wikiDB[id]; guardarWiki(); } }
-
-
-// Guardamos el artículo actualmente abierto para poder actualizarlo desde el editor
-let articuloActualID = null;
-function abrirArticulo(id) {
-    articuloActualID = id;
-    document.getElementById('editor-titulo').value = wikiDB[id].titulo;
-    document.getElementById('editor-contenido').value = wikiDB[id].contenido || "";
-    cambiarVista('vista-editor');
-}
-
-function guardarArticuloActual() {
-    if (!articuloActualID) return;
-    const titulo = document.getElementById('editor-titulo').value;
-    const contenido = document.getElementById('editor-contenido').value;
-    wikiDB[articuloActualID].titulo = titulo;
-    wikiDB[articuloActualID].contenido = contenido;
-    guardarWiki();
-}
+function abrirArticulo(id) { document.getElementById('editor-titulo').value = wikiDB[id].titulo; document.getElementById('editor-contenido').value = wikiDB[id].contenido || ""; cambiarVista('vista-editor'); }
 
 let fichasDB = JSON.parse(localStorage.getItem('fichasDM')) || {}; let fichaActualID = null;
 function renderizarFichasUI() { const lista = document.getElementById('lista-fichas-ui'); lista.innerHTML = ''; for(let id in fichasDB) { const div = document.createElement('div'); div.className = `item-lista-ficha ${id === fichaActualID ? 'activa' : ''}`; div.innerText = fichasDB[id].nombre || "Sin nombre"; div.onclick = () => cargarFichaEnEditor(id); lista.appendChild(div); } }
@@ -478,28 +248,5 @@ function crearFichaNueva() { const id = generarID(); fichasDB[id] = { id: id, no
 function cargarFichaEnEditor(id) { fichaActualID = id; document.getElementById('editor-ficha-ui').style.display = 'block'; const f = fichasDB[id]; ['nombre','hp','ca','ini','vel','fue','des','con','int','sab','car','notas'].forEach(c => document.getElementById(`ficha-${c}`).value = f[c] || ""); renderizarFichasUI(); }
 function guardarFichaActual() { if(!fichaActualID) return; const f = fichasDB[fichaActualID]; ['nombre','hp','ca','ini','vel','fue','des','con','int','sab','car','notas'].forEach(c => f[c] = document.getElementById(`ficha-${c}`).value); localStorage.setItem('fichasDM', JSON.stringify(fichasDB)); renderizarFichasUI(); }
 function exportarFichaSeleccionada() { if(!fichaActualID) return; const f = fichasDB[fichaActualID]; const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(f)); const a = document.createElement('a'); a.href = dataStr; a.download = `${f.nombre}_ficha.json`; a.click(); }
-
-function borrarFichaActual() {
-    if (!fichaActualID) return;
-    if (!confirm("¿Borrar esta ficha?")) return;
-    delete fichasDB[fichaActualID];
-    fichaActualID = null;
-    localStorage.setItem('fichasDM', JSON.stringify(fichasDB));
-    document.getElementById('editor-ficha-ui').style.display = 'none';
-    renderizarFichasUI();
-}
-
-// Lanzar dado desde el DM y notificar a los jugadores
-function lanzarDado(caras) {
-    const baseRoll = Math.floor(Math.random() * caras) + 1;
-    const paquete = { quien: 'Dungeon Master', caras: caras, resultado: baseRoll, mod: 0, total: baseRoll, motivo: '', tiempo: Date.now() };
-
-    if (typeof canalVTT !== 'undefined') {
-        canalVTT.send({ type: 'broadcast', event: 'dado-dm', payload: paquete });
-    }
-
-    // Mostrar localmente en la interfaz del DM
-    mostrarDadoFlotante(paquete.quien, paquete.caras, paquete.resultado, paquete.mod, paquete.motivo, paquete.total);
-}
 
 renderizarWiki(); renderizarGalerias(); renderizarFichasUI();
