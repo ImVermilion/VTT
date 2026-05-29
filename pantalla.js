@@ -108,11 +108,15 @@ async function inicializarProyeccionOnline() {
     if (resultadoDB.data) aplicarEstadoVTT(resultadoDB.data);
 
     // Escuchar cambios en la DB
-    supabaseClient.channel('cambios-db')
+    supabaseClient
+.channel('cambios-db')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vtt_estado' }, payload => {
             aplicarEstadoVTT(payload.new);
         })
-        .subscribe();
+        .subscribe((status) => {
+    console.log("Realtime:", status);
+});
+        
 
     // Escuchar dados del DM
     canalVTT.on('broadcast', { event: 'dado-dm' }, (mensaje) => {
@@ -161,52 +165,135 @@ function aplicarEstadoVTT(estado) {
 
 
 
+const colaDados = [];
+let procesandoDado = false;
+
 function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
-    boxDados.classList.add('mostrar');
-    arenaDados.innerHTML =
-`
-<div class="contenedor-dado-animado">
-    <div class="dado-visual ${cl}"
-        style="
-            width:75px;
-            height:75px;
-            font-size:2rem;
-            color:${color};
-        ">
-        ${total}
-    </div>
 
-    <p style="
-        color:#2ecc71;
-        font-weight:bold;
-        margin-top:6px;
-        text-align:center;
-    ">
-        ${quien}
-    </p>
-
-    <p style="
-        color:#aaa;
-        font-size:0.8rem;
-        text-align:center;
-    ">
-        ${motivo}
-    </p>
-</div>
-`;
-    clearTimeout(temporizadorDado);
-    temporizadorDado = setTimeout(() => boxDados.classList.remove('mostrar'), 3500);
-}
-
-function renderizarTokens(tokens) {
-    document.querySelectorAll('.token-jugador').forEach(t => t.remove());
-    tokens.forEach(t => {
-        const div = document.createElement('div');
-        div.className = 'token-jugador';
-        div.style.left = t.x; div.style.top = t.y; div.style.backgroundImage = `url(${t.img})`;
-        wrapperMapa.appendChild(div);
+    colaDados.push({
+        quien,
+        caras,
+        base,
+        mod,
+        motivo,
+        total
     });
+
+    if (!procesandoDado) {
+        procesarColaDados();
+    }
 }
+
+async function procesarColaDados() {
+
+    if (colaDados.length === 0) {
+        procesandoDado = false;
+        return;
+    }
+
+    procesandoDado = true;
+
+    const dado = colaDados.shift();
+
+    let cl = `forma-d${dado.caras}`;
+
+    let color = "white";
+
+    if (dado.caras === 20 && dado.base === 20)
+        color = "gold";
+
+    if (dado.caras === 20 && dado.base === 1)
+        color = "red";
+
+    const div = document.createElement('div');
+
+    div.className = 'dado-historial';
+
+    div.innerHTML = `
+        <div class="contenedor-dado-animado">
+
+            <div class="dado-visual ${cl} rodando"
+                style="
+                    width:75px;
+                    height:75px;
+                    font-size:2rem;
+                ">
+                ?
+            </div>
+
+        </div>
+    `;
+
+    arenaDados.prepend(div);
+
+    boxDados.classList.add('mostrar');
+
+    await new Promise(r => setTimeout(r, 600));
+
+    let sub =
+        dado.mod !== 0
+        ? `<br><span style="font-size:0.85rem;color:#aaa;">
+            (${dado.base} ${dado.mod >= 0 ? '+' : ''}${dado.mod})
+           </span>`
+        : '';
+
+    div.innerHTML = `
+        <div class="contenedor-dado-animado">
+
+            <div class="dado-visual ${cl}"
+                style="
+                    width:75px;
+                    height:75px;
+                    font-size:2rem;
+                    color:${color};
+                ">
+                ${dado.total}
+            </div>
+
+            <p style="
+                color:#2ecc71;
+                font-weight:bold;
+                text-align:center;
+                margin:5px 0;
+            ">
+                ${dado.quien}
+            </p>
+
+            <p style="
+                color:#ccc;
+                font-size:0.8rem;
+                text-align:center;
+            ">
+                ${dado.motivo}
+                ${sub}
+            </p>
+
+        </div>
+    `;
+
+    while (arenaDados.children.length > 8) {
+        arenaDados.removeChild(arenaDados.lastChild);
+    }
+
+    setTimeout(() => {
+        div.style.opacity = '0.3';
+    }, 5000);
+
+    setTimeout(() => {
+        div.remove();
+
+        if (arenaDados.children.length === 0) {
+            boxDados.classList.remove('mostrar');
+        }
+
+    }, 12000);
+
+    setTimeout(() => {
+        procesarColaDados();
+    }, 1200);
+}
+
+
 
 inicializarProyeccionOnline();
 
