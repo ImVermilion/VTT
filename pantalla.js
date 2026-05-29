@@ -5,8 +5,6 @@ const boxDados = document.getElementById('notificacion-dados-3d');
 const arenaDados = document.getElementById('arena-3d-jugadores');
 const elementoAudio = document.getElementById('audio-ambiente-vtt');
 
-let temporizadorDado;
-
 // --- GESTIÓN VISTAS JUGADOR ---
 function cambiarTabJugador(idTab, btn) {
     document.querySelectorAll('.player-vista').forEach(p => p.classList.remove('activa'));
@@ -19,73 +17,50 @@ function cambiarTabJugador(idTab, btn) {
 document.getElementById('nombre-jugador').value = localStorage.getItem('miNombreJugadorVTT') || '';
 document.getElementById('notas-privadas-jugador').value = localStorage.getItem('misNotasJugadorVTT') || '';
 
-function guardarNombreLocal() {
-    localStorage.setItem('miNombreJugadorVTT', document.getElementById('nombre-jugador').value);
+function guardarNombreLocal() { localStorage.setItem('miNombreJugadorVTT', document.getElementById('nombre-jugador').value); }
+function guardarNotasJugador() { localStorage.setItem('misNotasJugadorVTT', document.getElementById('notas-privadas-jugador').value); }
+
+if(document.getElementById('upload-ficha-json')) {
+    document.getElementById('upload-ficha-json').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                const data = JSON.parse(evt.target.result);
+                ['nombre','hp','ca','ini','vel'].forEach(c => {
+                    if(document.getElementById(`f-${c}`)) document.getElementById(`f-${c}`).innerText = data[c] || "-";
+                });
+                ['fue','des','con','int','sab','car'].forEach(a => {
+                    if(document.getElementById(`f-${a}`)) document.getElementById(`f-${a}`).innerText = data[a] || "10";
+                    let mod = Math.floor((parseInt(data[a] || 10) - 10) / 2);
+                    if(document.getElementById(`m-${a}`)) document.getElementById(`m-${a}`).innerText = mod >= 0 ? `+${mod}` : `${mod}`;
+                });
+                if(!document.getElementById('nombre-jugador').value) {
+                    document.getElementById('nombre-jugador').value = data.nombre || "Héroe";
+                    guardarNombreLocal();
+                }
+            } catch(err) { alert("Archivo JSON inválido."); }
+        };
+        reader.readAsText(file);
+    });
 }
 
-function guardarNotasJugador() {
-    localStorage.setItem('misNotasJugadorVTT', document.getElementById('notas-privadas-jugador').value);
-}
-
-document.getElementById('upload-ficha-json').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-
-    reader.onload = function(evt) {
-        try {
-            const data = JSON.parse(evt.target.result);
-
-            ['nombre','hp','ca','ini','vel'].forEach(c => {
-                if(document.getElementById(`f-${c}`))
-                    document.getElementById(`f-${c}`).innerText = data[c] || "-";
-            });
-
-            ['fue','des','con','int','sab','car'].forEach(a => {
-                if(document.getElementById(`f-${a}`))
-                    document.getElementById(`f-${a}`).innerText = data[a] || "10";
-                let mod = Math.floor((parseInt(data[a] || 10) - 10) / 2);
-                if(document.getElementById(`m-${a}`))
-                    document.getElementById(`m-${a}`).innerText = mod >= 0 ? `+${mod}` : `${mod}`;
-            });
-
-            if(!document.getElementById('nombre-jugador').value) {
-                document.getElementById('nombre-jugador').value = data.nombre || "Héroe";
-                guardarNombreLocal();
-            }
-
-        } catch(err) {
-            alert("Archivo JSON inválido.");
-        }
-    };
-    reader.readAsText(file);
-});
-
-// --- ENVIAR TIRADA (A través de Supabase) ---
+// --- ENVIAR TIRADA (Supabase Realtime) ---
 function procesarTiradaJugador(caras, mod, motivo) {
     const nick = document.getElementById('nombre-jugador').value || "Jugador";
-    const baseRoll = Math.floor(Math.random() * caras) + 1;
+    const numCaras = parseInt(caras);
+    const baseRoll = Math.floor(Math.random() * numCaras) + 1;
+    const modificador = parseInt(mod || 0);
+    const total = baseRoll + modificador;
     
     const paquete = {
-        quien: nick,
-        caras: caras,
-        resultado: baseRoll,
-        mod: parseInt(mod || 0),
-        total: baseRoll + parseInt(mod || 0),
-        motivo: motivo,
-        tiempo: Date.now()
+        quien: nick, caras: numCaras, resultado: baseRoll, mod: modificador, total: total, motivo: motivo, tiempo: Date.now()
     };
     
-    // Enviar al canal VTT para que el DM y los demás lo vean
     if (typeof canalVTT !== 'undefined') {
-        canalVTT.send({
-            type: 'broadcast',
-            event: 'dado-jugador',
-            payload: paquete
-        });
+        canalVTT.send({ type: 'broadcast', event: 'dado-jugador', payload: paquete });
     }
-
-    // Mostrárnoslo a nosotros mismos directamente
     mostrarDadoFlotante(paquete.quien, paquete.caras, paquete.resultado, paquete.mod, paquete.motivo, paquete.total);
 }
 
@@ -99,105 +74,100 @@ function tirarDadoGenericoJugador(caras) {
     procesarTiradaJugador(caras, 0, `d${caras}`);
 }
 
-// --- CONEXIÓN SUPABASE ---
+function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
+    const numCaras = parseInt(caras);
+    let cl = 'forma-d' + numCaras;
+    if (!numCaras || isNaN(numCaras)) cl = 'forma-d6';
+
+    let color = "white";
+    if (numCaras === 20 && base === 20) color = "gold";
+    if (numCaras === 20 && base === 1) color = "red";
+
+    let sub = mod !== 0 ? `<br><span style="font-size:0.85rem;color:#aaa;">(${base} ${mod >= 0 ? '+' : ''}${mod})</span>` : '';
+
+    const dadoDiv = document.createElement('div');
+    // Aquí el contenedor NO lleva "rodando", solo la estructura base
+    dadoDiv.className = 'contenedor-dado-animado';
+    
+    // Aquí el innerHTML SÍ lleva "rodando" exclusivamente en la caja de la forma del dado
+    dadoDiv.innerHTML = `
+        <div class="dado-visual ${cl} rodando" style="width:75px;height:75px;font-size:2.2rem;color:${color}; margin: 0 auto;">${total}</div>
+        <p style="color:#2ecc71;font-size:1.1rem;margin:6px 0 2px 0;font-weight:bold;text-align:center;">${quien}</p>
+        <p style="color:white;font-size:0.8rem;margin:0;text-align:center;">${motivo}${sub}</p>
+    `;
+
+    arenaDados.appendChild(dadoDiv);
+    boxDados.classList.add('mostrar');
+
+    // Historial
+    const hist = document.getElementById('historial-tiradas');
+    if (hist) {
+        const item = document.createElement('div');
+        item.style.padding = '6px';
+        item.style.borderBottom = '1px solid #333';
+        item.innerHTML = `<strong style="color:#2ecc71">${quien}</strong> tiró d${numCaras} <i>(${motivo})</i>: <b style="color:#3498db; font-size:1.2em">${total}</b>`;
+        hist.prepend(item);
+    }
+
+    if(typeof reproducirSonidoDado === 'function') reproducirSonidoDado();
+
+    setTimeout(() => {
+        dadoDiv.remove();
+        if (arenaDados.children.length === 0) boxDados.classList.remove('mostrar');
+    }, 4500);
+}
+
+// --- CONEXIÓN SUPABASE ONLINE ---
 async function inicializarProyeccionOnline() {
     if (typeof supabaseClient === 'undefined') return;
 
-    // Carga inicial
     let resultadoDB = await supabaseClient.from('vtt_estado').select('*').eq('id', 1).single();
     if (resultadoDB.data) aplicarEstadoVTT(resultadoDB.data);
 
-    // Escuchar cambios en la DB
     supabaseClient.channel('cambios-db')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vtt_estado' }, payload => {
             aplicarEstadoVTT(payload.new);
-        })
-        .subscribe();
+        }).subscribe();
 
-    // Escuchar dados del DM
     canalVTT.on('broadcast', { event: 'dado-dm' }, (mensaje) => {
-        mostrarDadoFlotante("Dungeon Master", mensaje.payload.caras, mensaje.payload.resultado, 0, "Tirada DM", mensaje.payload.resultado);
+        mostrarDadoFlotante("Dungeon Master", mensaje.payload.caras, mensaje.payload.resultado, 0, "Tirada DM", mensaje.payload.total);
     }).subscribe();
 
-    // Escuchar dados de otros jugadores
     canalVTT.on('broadcast', { event: 'dado-jugador' }, (mensaje) => {
         const p = mensaje.payload;
         if (p.quien !== document.getElementById('nombre-jugador').value) {
             mostrarDadoFlotante(p.quien, p.caras, p.resultado, p.mod, p.motivo, p.total);
         }
     }).subscribe();
+    
+    canalVTT.on('broadcast', { event: 'audio-comando' }, (mensaje) => {
+        if(elementoAudio) {
+            if (mensaje.payload.cmd === 'play') elementoAudio.play().catch(()=>{});
+            if (mensaje.payload.cmd === 'pause') elementoAudio.pause();
+        }
+    }).subscribe();
 }
 
 function aplicarEstadoVTT(estado) {
     if (estado.mapa_url) { imgMapa.src = estado.mapa_url; wrapperMapa.style.display = "inline-block"; }
-    if (estado.rejilla !== undefined) capaRejilla.style.display = estado.rejilla ? 'block' : 'none';
+    else { imgMapa.src = ""; wrapperMapa.style.display = "none"; }
+    
+    if (estado.rejilla !== undefined && capaRejilla) capaRejilla.style.display = estado.rejilla ? 'block' : 'none';
     if (estado.tokens) renderizarTokens(estado.tokens);
-}
 
-function procesarTiradaJugador(caras, mod, motivo) {
-    const total = Math.floor(Math.random() * caras) + 1 + mod;
-    const nick = document.getElementById('nombre-jugador').value || "Jugador";
-    canalVTT.send({ type: 'broadcast', event: 'dado-jugador', payload: { quien: nick, total: total, mod: mod, motivo: motivo } });
-    mostrarDadoFlotante(nick, caras, total - mod, mod, motivo, total);
-}
-
-function tirarDadoGenericoJugador(caras) { procesarTiradaJugador(caras, 0, "d" + caras); }
-
-function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
-    boxDados.classList.add('mostrar');
-    arenaDados.innerHTML = `<div class="dado-visual" style="font-size:2rem;">${total}</div><p>${quien} - ${motivo}</p>`;
-    clearTimeout(temporizadorDado);
-    temporizadorDado = setTimeout(() => boxDados.classList.remove('mostrar'), 3500);
+    if (estado.audio_url && elementoAudio && !elementoAudio.src.endsWith(estado.audio_url)) {
+        elementoAudio.src = estado.audio_url;
+    }
+    if (estado.audio_volumen !== undefined && elementoAudio) {
+        elementoAudio.volume = estado.audio_volumen;
+    }
 }
 
 function renderizarTokens(tokens) {
     document.querySelectorAll('.token-jugador').forEach(t => t.remove());
-    tokens.forEach(t => {
-        const div = document.createElement('div');
-        div.className = 'token-jugador';
-        div.style.left = t.x; div.style.top = t.y; div.style.backgroundImage = `url(${t.img})`;
-        wrapperMapa.appendChild(div);
-    });
-}
-
-inicializarProyeccionOnline();
-
-function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
-    let cl = `forma-d${caras}`;
-    boxDados.classList.add('mostrar');
-
-    arenaDados.innerHTML =
-        `<div class="contenedor-dado-animado">
-            <div class="dado-visual ${cl} rodando" style="width:75px;height:75px;font-size:1.8rem;">?</div>
-        </div>`;
-
-    setTimeout(() => {
-        let color = "white";
-        if (caras === 20 && base === 20) color = "gold";
-        if (caras === 20 && base === 1) color = "red";
-
-        let sub = mod !== 0 ? `<br><span style="font-size:0.85rem;color:#aaa;">(${base} ${mod >= 0 ? '+' : ''}${mod})</span>` : '';
-
-        arenaDados.innerHTML =
-            `<div class="contenedor-dado-animado">
-                <div class="dado-visual ${cl}" style="width:75px;height:75px;font-size:2.2rem;color:${color};">${total}</div>
-                <p style="color:#2ecc71;font-size:1.1rem;margin:6px 0 2px 0;font-weight:bold;text-align:center;">${quien}</p>
-                <p style="color:white;font-size:0.8rem;margin:0;text-align:center;">${motivo}${sub}</p>
-            </div>`;
-
-        clearTimeout(temporizadorDado);
-        temporizadorDado = setTimeout(() => {
-            boxDados.classList.remove('mostrar');
-        }, 3500);
-    }, 600);
-}
-
-function renderizarTokens(tokens) {
-    document.querySelectorAll('.token-jugador').forEach(t => t.remove());
-
+    if(!tokens) return;
     tokens.forEach(t => {
         if (!t.visible) return;
-
         const tokenEl = document.createElement('div');
         tokenEl.className = 'token-jugador';
         tokenEl.style.width = t.escala + 'px';
@@ -206,7 +176,8 @@ function renderizarTokens(tokens) {
         tokenEl.style.backgroundImage = `url(${t.img})`;
         tokenEl.style.left = t.x;
         tokenEl.style.top = t.y;
-
         wrapperMapa.appendChild(tokenEl);
     });
 }
+
+inicializarProyeccionOnline();
