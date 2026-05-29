@@ -452,7 +452,25 @@ function importarCampañaCompleta(file) {
 function renderizarWiki() { document.getElementById('arbol-glosario').innerHTML = construirArbolHTML('root'); }
 function crearElemento(idPadre, tipo) { const titulo = prompt(`Nombre:`); if (titulo) { const nid = generarID(); wikiDB[nid] = { id: nid, tipo: tipo, titulo: titulo, padre: idPadre, hijos: tipo === 'carpeta' ? [] : undefined, contenido: "" }; wikiDB[idPadre].hijos.push(nid); guardarWiki(); } }
 function borrarElemento(id, idPadre) { if (confirm("¿Borrar?")) { wikiDB[idPadre].hijos = wikiDB[idPadre].hijos.filter(h => h !== id); delete wikiDB[id]; guardarWiki(); } }
-function abrirArticulo(id) { document.getElementById('editor-titulo').value = wikiDB[id].titulo; document.getElementById('editor-contenido').value = wikiDB[id].contenido || ""; cambiarVista('vista-editor'); }
+
+
+// Guardamos el artículo actualmente abierto para poder actualizarlo desde el editor
+let articuloActualID = null;
+function abrirArticulo(id) {
+    articuloActualID = id;
+    document.getElementById('editor-titulo').value = wikiDB[id].titulo;
+    document.getElementById('editor-contenido').value = wikiDB[id].contenido || "";
+    cambiarVista('vista-editor');
+}
+
+function guardarArticuloActual() {
+    if (!articuloActualID) return;
+    const titulo = document.getElementById('editor-titulo').value;
+    const contenido = document.getElementById('editor-contenido').value;
+    wikiDB[articuloActualID].titulo = titulo;
+    wikiDB[articuloActualID].contenido = contenido;
+    guardarWiki();
+}
 
 let fichasDB = JSON.parse(localStorage.getItem('fichasDM')) || {}; let fichaActualID = null;
 function renderizarFichasUI() { const lista = document.getElementById('lista-fichas-ui'); lista.innerHTML = ''; for(let id in fichasDB) { const div = document.createElement('div'); div.className = `item-lista-ficha ${id === fichaActualID ? 'activa' : ''}`; div.innerText = fichasDB[id].nombre || "Sin nombre"; div.onclick = () => cargarFichaEnEditor(id); lista.appendChild(div); } }
@@ -460,5 +478,28 @@ function crearFichaNueva() { const id = generarID(); fichasDB[id] = { id: id, no
 function cargarFichaEnEditor(id) { fichaActualID = id; document.getElementById('editor-ficha-ui').style.display = 'block'; const f = fichasDB[id]; ['nombre','hp','ca','ini','vel','fue','des','con','int','sab','car','notas'].forEach(c => document.getElementById(`ficha-${c}`).value = f[c] || ""); renderizarFichasUI(); }
 function guardarFichaActual() { if(!fichaActualID) return; const f = fichasDB[fichaActualID]; ['nombre','hp','ca','ini','vel','fue','des','con','int','sab','car','notas'].forEach(c => f[c] = document.getElementById(`ficha-${c}`).value); localStorage.setItem('fichasDM', JSON.stringify(fichasDB)); renderizarFichasUI(); }
 function exportarFichaSeleccionada() { if(!fichaActualID) return; const f = fichasDB[fichaActualID]; const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(f)); const a = document.createElement('a'); a.href = dataStr; a.download = `${f.nombre}_ficha.json`; a.click(); }
+
+function borrarFichaActual() {
+    if (!fichaActualID) return;
+    if (!confirm("¿Borrar esta ficha?")) return;
+    delete fichasDB[fichaActualID];
+    fichaActualID = null;
+    localStorage.setItem('fichasDM', JSON.stringify(fichasDB));
+    document.getElementById('editor-ficha-ui').style.display = 'none';
+    renderizarFichasUI();
+}
+
+// Lanzar dado desde el DM y notificar a los jugadores
+function lanzarDado(caras) {
+    const baseRoll = Math.floor(Math.random() * caras) + 1;
+    const paquete = { quien: 'Dungeon Master', caras: caras, resultado: baseRoll, mod: 0, total: baseRoll, motivo: '', tiempo: Date.now() };
+
+    if (typeof canalVTT !== 'undefined') {
+        canalVTT.send({ type: 'broadcast', event: 'dado-dm', payload: paquete });
+    }
+
+    // Mostrar localmente en la interfaz del DM
+    mostrarDadoFlotante(paquete.quien, paquete.caras, paquete.resultado, paquete.mod, paquete.motivo, paquete.total);
+}
 
 renderizarWiki(); renderizarGalerias(); renderizarFichasUI();
