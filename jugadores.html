@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Tablero y Ficha - Jugador</title>
+    <link rel="stylesheet" href="estilos.css">
+</head>
+<body class="player-layout">
+
+    <nav class="player-nav">
+        <input type="text" id="nombre-jugador" placeholder="Tu Nombre..." style="background: #111; color: white; border: 1px solid #444; padding: 10px; border-radius: 4px;" oninput="guardarNombreLocal()">
+        <button onclick="cambiarTabJugador('v-mapa', this)" class="activa">🗺️ Mapa</button>
+        <button onclick="cambiarTabJugador('v-ficha', this)">👥 Mi Ficha</button>
+        <button onclick="cambiarTabJugador('v-dados', this)">🎲 Dados y Notas</button>
+        <button onclick="document.getElementById('audio-ambiente-vtt').play().catch(() => {}); this.style.display='none';" style="background: #e74c3c; animation: pulse 1s infinite;">🔊 Conectar Audio</button>
+    </nav>
+
+    <div id="v-mapa" class="player-vista activa">
+        <div class="centrador-mapa">
+            <div id="wrapper-mapa" class="wrapper-mapa" style="display: none;">
+                <img id="img-mapa" class="img-mapa" src="">
+                <div id="capa-rejilla" class="rejilla"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="v-ficha" class="player-vista">
+        <div class="player-ficha-container">
+            <label style="background: #3498db; color: white; padding: 10px 20px; cursor: pointer; border-radius: 4px; display: inline-block; margin-bottom: 20px;">
+                📥 Cargar mi Ficha (.json) <input type="file" id="upload-ficha-json" accept=".json" style="display:none;">
+            </label>
+            <h1 id="f-nombre" style="color: #2ecc71; border-bottom: 2px solid #333; padding-bottom: 10px;">-</h1>
+            
+            <div class="grid-stats-player">
+                <div class="stat-box"><label>❤️ HP</label><div id="f-hp">-</div></div>
+                <div class="stat-box"><label>🛡️ CA</label><div id="f-ca">-</div></div>
+                <div class="stat-box"><label>⚡ INICIATIVA</label><div id="f-ini">-</div></div>
+                <div class="stat-box"><label>👟 VELOCIDAD</label><div id="f-vel">-</div></div>
+            </div>
+            
+            <h3 style="color:#aaa; text-align:center;">Atributos (Clic para tirar d20)</h3>
+            <div class="grid-atributos-player">
+                <div class="stat-box"><label>FUE</label><div id="f-fue">10</div><button onclick="tirarAtributoJugador('Fuerza', 'f-fue')" id="m-fue">+0</button></div>
+                <div class="stat-box"><label>DES</label><div id="f-des">10</div><button onclick="tirarAtributoJugador('Destreza', 'f-des')" id="m-des">+0</button></div>
+                <div class="stat-box"><label>CON</label><div id="f-con">10</div><button onclick="tirarAtributoJugador('Constitución', 'f-con')" id="m-con">+0</button></div>
+                <div class="stat-box"><label>INT</label><div id="f-int">10</div><button onclick="tirarAtributoJugador('Inteligencia', 'f-int')" id="m-int">+0</button></div>
+                <div class="stat-box"><label>SAB</label><div id="f-sab">10</div><button onclick="tirarAtributoJugador('Sabiduría', 'f-sab')" id="m-sab">+0</button></div>
+                <div class="stat-box"><label>CAR</label><div id="f-car">10</div><button onclick="tirarAtributoJugador('Carisma', 'f-car')" id="m-car">+0</button></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="v-dados" class="player-vista" style="flex-direction: column; align-items: center;">
+        <div class="player-dados-container">
+            <button onclick="tirarDadoGenericoJugador(4)">d4</button>
+            <button onclick="tirarDadoGenericoJugador(6)">d6</button>
+            <button onclick="tirarDadoGenericoJugador(8)">d8</button>
+            <button onclick="tirarDadoGenericoJugador(10)">d10</button>
+            <button onclick="tirarDadoGenericoJugador(12)">d12</button>
+            <button onclick="tirarDadoGenericoJugador(20)">d20</button>
+            <button onclick="tirarDadoGenericoJugador(100)" style="grid-column: span 3; background: var(--accent);">d100</button>
+        </div>
+        <div style="width: 100%; max-width: 600px; margin-top: 20px;">
+            <label style="color:#aaa; font-weight:bold;">Tus Notas Privadas:</label>
+            <textarea id="notas-privadas-jugador" placeholder="Escribe aquí tu inventario o secretos..." oninput="guardarNotasJugador()"></textarea>
+        </div>
+    </div>
+
+    <div id="notificacion-dados-3d"><div id="arena-3d-jugadores"></div></div>
+
+    <audio id="audio-ambiente-vtt" loop></audio>
+
+    <script src="pantalla.js"></script>
+    <script>
+  // Inicialización (Usa tus claves de Supabase Settings > API)
+  const supabaseUrl = 'https://kbaxoysuotwwrolybenw.supabase.co';
+  const supabaseKey = 'sb_publishable_ethKeei2lOPZUEXpkWr8bQ_DcbplFdt';
+  const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+  
+  // Creamos un canal de comunicación en tiempo real
+  const canalVTT = supabase.channel('sala-partida');
+</script>
+</body>
+</html>
