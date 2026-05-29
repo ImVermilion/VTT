@@ -16,6 +16,7 @@ body.dm-layout { display: grid; grid-template-columns: 300px 1fr 280px; grid-tem
 .dm-vista.activa { display: block; }
 
 /* Menús y Formularios DM */
+
 #editor-titulo { width: 100%; padding: 10px; font-size: 1.5rem; background: #333; color: white; border: none; margin-bottom: 10px; box-sizing: border-box; }
 #editor-contenido { width: 100%; height: 80%; padding: 10px; background: #333; color: white; border: none; resize: none; box-sizing: border-box; font-family: inherit;}
 ul { list-style-type: none; padding-left: 20px; }
@@ -84,7 +85,7 @@ body.player-layout { display: flex; flex-direction: column; height: 100vh; backg
 }
 .img-mapa {
     display: block;
-    max-width: none 
+    max-width: none;
     width: auto;
     height: auto;
 }
@@ -104,6 +105,7 @@ body.player-layout { display: flex; flex-direction: column; height: 100vh; backg
     display: none;
     z-index: 5;
 }
+
 .rejilla.activa { display: block; }
 
 .token-dm, .token-jugador { position: absolute; border-radius: 50%; border: 3px solid; box-shadow: 0 4px 10px rgba(0,0,0,0.8); transform: translate(-50%, -50%); background-size: cover; background-position: center; z-index: 10; }
@@ -124,7 +126,18 @@ body.player-layout { display: flex; flex-direction: column; height: 100vh; backg
 
 .rodando { animation: botarYRodar 0.6s cubic-bezier(0.36, 0, 0.66, -0.56) forwards; }
 @keyframes botarYRodar { 0% { transform: translateY(-120px) rotate(-180deg) scale(0.6); opacity: 0; } 50% { transform: translateY(15px) rotate(90deg) scale(1.1); opacity: 1; } 100% { transform: translateY(0) rotate(360deg) scale(1); } }
+#arena-3d-jugadores{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    align-items:center;
+    max-height:80vh;
+    overflow:hidden;
+}
 
+.dado-historial{
+    transition:opacity 1s;
+}
 /* Alerta de dados Jugador (esquina) */
 #notificacion-dados-3d { position: fixed; bottom: 30px; right: 30px; background: rgba(20, 20, 20, 0.95); border: 2px solid var(--accent); padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); transform: translateX(200%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 500; }
 #notificacion-dados-3d.mostrar { transform: translateX(0); }
