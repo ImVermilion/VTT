@@ -15,7 +15,7 @@ function cambiarTabJugador(idTab, btn) {
     btn.classList.add('activa');
 }
 
-// --- FICHA Y AUTO-GUARDADO (Local) ---
+// --- FICHA Y AUTO-GUARDADO ---
 document.getElementById('nombre-jugador').value = localStorage.getItem('miNombreJugadorVTT') || '';
 document.getElementById('notas-privadas-jugador').value = localStorage.getItem('misNotasJugadorVTT') || '';
 
@@ -99,74 +99,65 @@ function tirarDadoGenericoJugador(caras) {
     procesarTiradaJugador(caras, 0, `d${caras}`);
 }
 
-// --- RECIBIR DEL DM Y SINCRONIZAR (SUPABASE) ---
+// --- CONEXIÓN SUPABASE ---
 async function inicializarProyeccionOnline() {
-    if (typeof supabaseClient === 'undefined') {
-        console.warn("Supabase no está configurado. El mapa no funcionará online.");
-        return;
-    }
+    if (typeof supabaseClient === 'undefined') return;
 
-    // 1. Cargar el estado inicial (Usamos 'respuestaDB' en vez de 'data' para evitar el error)
-    let respuestaDB = await supabaseClient.from('vtt_estado').select('*').eq('id', 1).single();
-    if (respuestaDB.data) aplicarEstadoVTT(respuestaDB.data);
+    // Carga inicial
+    let resultadoDB = await supabaseClient.from('vtt_estado').select('*').eq('id', 1).single();
+    if (resultadoDB.data) aplicarEstadoVTT(resultadoDB.data);
 
-    // 2. Escuchar cambios de la base de datos en tiempo real (Movimientos, Mapas...)
+    // Escuchar cambios en la DB
     supabaseClient.channel('cambios-db')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vtt_estado' }, payload => {
             aplicarEstadoVTT(payload.new);
         })
         .subscribe();
 
-    // 3. Escuchar eventos Broadcast (Tiradas de dados y Play/Pause de música)
+    // Escuchar dados del DM
     canalVTT.on('broadcast', { event: 'dado-dm' }, (mensaje) => {
-        const info = mensaje.payload;
-        mostrarDadoFlotante("Dungeon Master", info.caras, info.resultado, 0, `Tirada del DM`, info.resultado);
+        mostrarDadoFlotante("Dungeon Master", mensaje.payload.caras, mensaje.payload.resultado, 0, "Tirada DM", mensaje.payload.resultado);
     }).subscribe();
 
+    // Escuchar dados de otros jugadores
     canalVTT.on('broadcast', { event: 'dado-jugador' }, (mensaje) => {
-        const info = mensaje.payload;
-        // Solo lo mostramos si es de OTRO jugador
-        if (info.quien !== (document.getElementById('nombre-jugador').value || "Jugador")) {
-            mostrarDadoFlotante(info.quien, info.caras, info.resultado, info.mod, info.motivo, info.total);
-        }
-    }).subscribe();
-
-    canalVTT.on('broadcast', { event: 'audio-comando' }, (mensaje) => {
-        if (mensaje.payload.cmd === 'play') {
-            elementoAudio.play().catch(err => console.log('El navegador bloqueó el autoplay. Debes conectar el audio.', err));
-        } else if (mensaje.payload.cmd === 'pause') {
-            elementoAudio.pause();
+        const p = mensaje.payload;
+        if (p.quien !== document.getElementById('nombre-jugador').value) {
+            mostrarDadoFlotante(p.quien, p.caras, p.resultado, p.mod, p.motivo, p.total);
         }
     }).subscribe();
 }
 
 function aplicarEstadoVTT(estado) {
-    // Mapa
-    if (estado.mapa_url !== undefined) {
-        if (estado.mapa_url) {
-            imgMapa.src = estado.mapa_url;
-            wrapperMapa.style.display = "inline-block";
-        } else {
-            imgMapa.src = "";
-            wrapperMapa.style.display = "none";
-        }
-    }
-    // Rejilla
-    if (estado.rejilla !== undefined) {
-        if(estado.rejilla) capaRejilla.classList.add('activa');
-        else capaRejilla.classList.remove('activa');
-    }
-    // Tokens
-    if (estado.tokens !== undefined) {
-        renderizarTokens(estado.tokens || []);
-    }
-    // Audio (Solo URL y Volumen, el Play/Pause va por broadcast)
-    if (estado.audio_url !== undefined && estado.audio_url !== elementoAudio.src) {
-        elementoAudio.src = estado.audio_url;
-    }
-    if (estado.audio_volumen !== undefined) {
-        elementoAudio.volume = parseFloat(estado.audio_volumen);
-    }
+    if (estado.mapa_url) { imgMapa.src = estado.mapa_url; wrapperMapa.style.display = "inline-block"; }
+    if (estado.rejilla !== undefined) capaRejilla.style.display = estado.rejilla ? 'block' : 'none';
+    if (estado.tokens) renderizarTokens(estado.tokens);
+}
+
+function procesarTiradaJugador(caras, mod, motivo) {
+    const total = Math.floor(Math.random() * caras) + 1 + mod;
+    const nick = document.getElementById('nombre-jugador').value || "Jugador";
+    canalVTT.send({ type: 'broadcast', event: 'dado-jugador', payload: { quien: nick, total: total, mod: mod, motivo: motivo } });
+    mostrarDadoFlotante(nick, caras, total - mod, mod, motivo, total);
+}
+
+function tirarDadoGenericoJugador(caras) { procesarTiradaJugador(caras, 0, "d" + caras); }
+
+function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
+    boxDados.classList.add('mostrar');
+    arenaDados.innerHTML = `<div class="dado-visual" style="font-size:2rem;">${total}</div><p>${quien} - ${motivo}</p>`;
+    clearTimeout(temporizadorDado);
+    temporizadorDado = setTimeout(() => boxDados.classList.remove('mostrar'), 3500);
+}
+
+function renderizarTokens(tokens) {
+    document.querySelectorAll('.token-jugador').forEach(t => t.remove());
+    tokens.forEach(t => {
+        const div = document.createElement('div');
+        div.className = 'token-jugador';
+        div.style.left = t.x; div.style.top = t.y; div.style.backgroundImage = `url(${t.img})`;
+        wrapperMapa.appendChild(div);
+    });
 }
 
 inicializarProyeccionOnline();
