@@ -4,6 +4,27 @@ function cambiarVista(idVista) {
 }
 
 // --- UTILIDAD SUPABASE ---
+async function subirArchivoSupabase(file, bucket) {
+    const nombre = `${Date.now()}-${file.name}`;
+
+    const { data, error } = await supabaseClient
+        .storage
+        .from(bucket)
+        .upload(nombre, file);
+
+    if (error) {
+        console.error(error);
+        alert("Error subiendo archivo");
+        return null;
+    }
+
+    const { data: urlData } = supabaseClient
+        .storage
+        .from(bucket)
+        .getPublicUrl(nombre);
+
+    return urlData.publicUrl;
+}
 // Función para actualizar la tabla de estado en la nube
 async function actualizarEstadoVTT(payload) {
     if (typeof supabaseClient !== 'undefined') {
@@ -21,16 +42,33 @@ let galeriaTokens = JSON.parse(localStorage.getItem('galeriaTokens')) || [];
 let mapaEnMemoria = null; let estadoRejilla = false; let tokensEnMapa = []; 
 const wrapperMapa = document.getElementById('wrapper-mapa'); let tokenActivoID = null;
 
-document.getElementById('btn-guardar-galeria').addEventListener('click', function() {
+document.getElementById('btn-guardar-galeria').addEventListener('click', async function() {
+
     const archivoInput = document.getElementById('input-archivo');
     const tipo = document.getElementById('tipo-archivo').value;
+
     if (!archivoInput.files[0]) return;
-    const lector = new FileReader();
-    lector.onload = function(e) {
-        if (tipo === 'mapa') { galeriaMapas.push(e.target.result); localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas)); } 
-        else { galeriaTokens.push(e.target.result); localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens)); }
-        renderizarGalerias(); archivoInput.value = ""; 
-    }; lector.readAsDataURL(archivoInput.files[0]);
+
+    const file = archivoInput.files[0];
+
+    let bucket = tipo === 'mapa'
+        ? 'mapas'
+        : 'tokens';
+
+    const url = await subirArchivoSupabase(file, bucket);
+
+    if (!url) return;
+
+    if (tipo === 'mapa') {
+        galeriaMapas.push(url);
+        localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas));
+    } else {
+        galeriaTokens.push(url);
+        localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens));
+    }
+
+    renderizarGalerias();
+    archivoInput.value = "";
 });
 
 function renderizarGalerias() {
@@ -137,11 +175,20 @@ function sincronizarTokensJugadores() {
 
 // --- AUDIO Y MÚSICA ---
 let audioEnMemoria = null; const audioDM = document.getElementById('audio-ambiente-dm');
-document.getElementById('input-audio').addEventListener('change', function(e) {
-    const archivo = e.target.files[0]; if (!archivo) return;
-    const lector = new FileReader();
-    lector.onload = function(evt) { audioEnMemoria = evt.target.result; document.getElementById('status-audio').innerText = "Cargado: " + archivo.name; };
-    lector.readAsDataURL(archivo);
+document.getElementById('input-audio').addEventListener('change', async function(e) {
+
+    const archivo = e.target.files[0];
+
+    if (!archivo) return;
+
+    const url = await subirArchivoSupabase(archivo, 'audio');
+
+    if (!url) return;
+
+    audioEnMemoria = url;
+
+    document.getElementById('status-audio').innerText =
+        "Audio cargado";
 });
 
 document.getElementById('btn-play-audio').addEventListener('click', async function() {
@@ -236,6 +283,63 @@ function construirArbolHTML(idElemento) {
         el.hijos.forEach(hijoID => { html += construirArbolHTML(hijoID); }); 
         html += `</ul>`; return `<li>${html}</li>`; 
     }
+}
+function exportarCampañaCompleta() {
+
+    const campaña = {
+
+        wikiDB,
+        fichasDB,
+        galeriaMapas,
+        galeriaTokens
+
+    };
+
+    const dataStr =
+        "data:text/json;charset=utf-8," +
+        encodeURIComponent(JSON.stringify(campaña));
+
+    const a = document.createElement('a');
+
+    a.href = dataStr;
+
+    a.download = "campaña_vtt.json";
+
+    a.click();
+}
+function importarCampañaCompleta(file) {
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+
+        try {
+
+            const data = JSON.parse(e.target.result);
+
+            wikiDB = data.wikiDB || {};
+            fichasDB = data.fichasDB || {};
+            galeriaMapas = data.galeriaMapas || [];
+            galeriaTokens = data.galeriaTokens || [];
+
+            localStorage.setItem('wikiDM', JSON.stringify(wikiDB));
+            localStorage.setItem('fichasDM', JSON.stringify(fichasDB));
+            localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas));
+            localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens));
+
+            renderizarWiki();
+            renderizarFichasUI();
+            renderizarGalerias();
+
+            alert("Campaña importada");
+
+        } catch(err) {
+
+            alert("Archivo inválido");
+        }
+    };
+
+    reader.readAsText(file);
 }
 function renderizarWiki() { document.getElementById('arbol-glosario').innerHTML = construirArbolHTML('root'); }
 function crearElemento(idPadre, tipo) { const titulo = prompt(`Nombre:`); if (titulo) { const nid = generarID(); wikiDB[nid] = { id: nid, tipo: tipo, titulo: titulo, padre: idPadre, hijos: tipo === 'carpeta' ? [] : undefined, contenido: "" }; wikiDB[idPadre].hijos.push(nid); guardarWiki(); } }
