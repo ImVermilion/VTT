@@ -1,7 +1,4 @@
-// --- LIMPIEZA DE INTERFAZ (Elimina los inputs de archivos del PC) ---
-document.querySelectorAll('input[type="file"]').forEach(el => {
-    el.style.display = 'none'; // Los ocultamos de la vista
-});
+
 
 function cambiarVista(idVista) {
     document.querySelectorAll('.dm-vista').forEach(v => v.classList.remove('activa'));
@@ -28,33 +25,107 @@ const wrapperMapa = document.getElementById('wrapper-mapa'); let tokenActivoID =
 
 document.getElementById('btn-guardar-galeria').addEventListener('click', function(e) {
     e.preventDefault();
-    const tipo = document.getElementById('tipo-archivo').value;
-    const nombreArchivo = prompt(`Escribe el nombre del archivo en la carpeta assets/${tipo === 'mapa' ? 'mapas' : 'tokens'}/ de tu GitHub (ej. cueva.jpg):`);
-    
-    if (!nombreArchivo) return;
 
-    const urlGithub = `assets/${tipo === 'mapa' ? 'mapas' : 'tokens'}/${nombreArchivo}`;
+    const input = document.getElementById('input-archivo');
+    const archivo = input.files[0];
 
-    if (tipo === 'mapa') {
-        galeriaMapas.push(urlGithub);
-        localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas));
-    } else {
-        galeriaTokens.push(urlGithub);
-        localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens));
+    if (!archivo) {
+        alert('Selecciona un archivo');
+        return;
     }
 
-    renderizarGalerias();
+    const tipo = document.getElementById('tipo-archivo').value;
+
+    const reader = new FileReader();
+
+    reader.onload = function(evt) {
+        const dataURL = evt.target.result;
+
+        if (tipo === 'mapa') {
+            if (!galeriaMapas.includes(dataURL)) {
+                galeriaMapas.push(dataURL);
+                localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas));
+            }
+        }
+
+        if (tipo === 'token') {
+            if (!galeriaTokens.includes(dataURL)) {
+                galeriaTokens.push(dataURL);
+                localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens));
+            }
+        }
+
+        renderizarGalerias();
+    };
+
+    reader.readAsDataURL(archivo);
 });
 
 function renderizarGalerias() {
-    document.getElementById('galeria-mapas').innerHTML = ''; document.getElementById('galeria-tokens').innerHTML = '';
-    galeriaMapas.forEach(url => {
-        const img = document.createElement('div'); img.className = 'item-galeria'; img.style.backgroundImage = `url(${url})`;
-        img.onclick = () => cargarMapaEnTablero(url); document.getElementById('galeria-mapas').appendChild(img);
+
+    const gm = document.getElementById('galeria-mapas');
+    const gt = document.getElementById('galeria-tokens');
+
+    gm.innerHTML = '';
+    gt.innerHTML = '';
+
+    galeriaMapas.forEach((url, index) => {
+
+        const cont = document.createElement('div');
+        cont.style.position = 'relative';
+
+        const img = document.createElement('div');
+        img.className = 'item-galeria';
+        img.style.backgroundImage = `url(${url})`;
+        img.onclick = () => cargarMapaEnTablero(url);
+
+        const del = document.createElement('button');
+        del.innerText = '❌';
+        del.style.position = 'absolute';
+        del.style.top = '0';
+        del.style.right = '0';
+        del.onclick = (e) => {
+            e.stopPropagation();
+
+            galeriaMapas.splice(index, 1);
+            localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas));
+            renderizarGalerias();
+        };
+
+        cont.appendChild(img);
+        cont.appendChild(del);
+
+        gm.appendChild(cont);
     });
-    galeriaTokens.forEach(url => {
-        const img = document.createElement('div'); img.className = 'item-galeria'; img.style.backgroundImage = `url(${url})`;
-        img.onclick = () => crearToken(url); document.getElementById('galeria-tokens').appendChild(img);
+
+    galeriaTokens.forEach((url, index) => {
+
+        const cont = document.createElement('div');
+        cont.style.position = 'relative';
+
+        const img = document.createElement('div');
+        img.className = 'item-galeria';
+        img.style.backgroundImage = `url(${url})`;
+        img.onclick = () => crearToken(url);
+
+        const del = document.createElement('button');
+        del.innerText = '❌';
+        del.style.position = 'absolute';
+        del.style.top = '0';
+        del.style.right = '0';
+
+        del.onclick = (e) => {
+            e.stopPropagation();
+
+            galeriaTokens.splice(index, 1);
+            localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens));
+            renderizarGalerias();
+        };
+
+        cont.appendChild(img);
+        cont.appendChild(del);
+
+        gt.appendChild(cont);
     });
 }
 
@@ -298,7 +369,9 @@ function importarCampañaCompleta(file) {
             const data = JSON.parse(e.target.result);
             wikiDB = data.wikiDB || {}; fichasDB = data.fichasDB || {}; galeriaMapas = data.galeriaMapas || []; galeriaTokens = data.galeriaTokens || [];
             localStorage.setItem('wikiDM', JSON.stringify(wikiDB)); localStorage.setItem('fichasDM', JSON.stringify(fichasDB)); localStorage.setItem('galeriaMapas', JSON.stringify(galeriaMapas)); localStorage.setItem('galeriaTokens', JSON.stringify(galeriaTokens));
-            renderizarWiki(); renderizarFichasUI(); renderizarGalerias();
+            renderizarWiki(); renderizarFichasUI(); renderizarGalerias();renderizarInventario();
+renderizarSkills();
+renderizarConjuros();
             alert("Campaña importada");
         } catch(err) { alert("Archivo inválido"); }
     };
@@ -311,10 +384,190 @@ function abrirArticulo(id) { document.getElementById('editor-titulo').value = wi
 
 let fichasDB = JSON.parse(localStorage.getItem('fichasDM')) || {}; let fichaActualID = null;
 function renderizarFichasUI() { const lista = document.getElementById('lista-fichas-ui'); lista.innerHTML = ''; for(let id in fichasDB) { const div = document.createElement('div'); div.className = `item-lista-ficha ${id === fichaActualID ? 'activa' : ''}`; div.innerText = fichasDB[id].nombre || "Sin nombre"; div.onclick = () => cargarFichaEnEditor(id); lista.appendChild(div); } }
-function crearFichaNueva() { const id = generarID(); fichasDB[id] = { id: id, nombre: "Nuevo", hp: "10", ca: "10", ini: "0", vel: "30", fue: "10", des: "10", con: "10", int: "10", sab: "10", car: "10", notas: "" }; localStorage.setItem('fichasDM', JSON.stringify(fichasDB)); cargarFichaEnEditor(id); }
+function crearFichaNueva() {
+    const id = generarID();
+
+    fichasDB[id] = {
+        id,
+        nombre: "Nuevo Personaje",
+        clase: "",
+        nivel: 1,
+        raza: "",
+        trasfondo: "",
+        alineamiento: "",
+        xp: 0,
+        competencia: 2,
+
+        hp_actual: 10,
+        hp_max: 10,
+        ca: 10,
+        ini: 0,
+        vel: 30,
+
+        fue: 10,
+        des: 10,
+        con: 10,
+        int: 10,
+        sab: 10,
+        car: 10,
+
+        skills: {
+            atletismo: 0,
+            acrobacias: 0,
+            sigilo: 0,
+            percepcion: 0,
+            investigacion: 0,
+            persuasion: 0,
+            engaño: 0,
+            arcano: 0,
+            historia: 0,
+            religion: 0,
+            medicina: 0,
+            naturaleza: 0,
+            supervivencia: 0
+        },
+
+        conjuros: {
+            nivel1: { max: 2, usados: 0 },
+            nivel2: { max: 0, usados: 0 },
+            nivel3: { max: 0, usados: 0 }
+        },
+
+        inventario: [],
+
+        oro: 0,
+
+        notas: ""
+    };
+
+    localStorage.setItem('fichasDM', JSON.stringify(fichasDB));
+    cargarFichaEnEditor(id);
+}
 function cargarFichaEnEditor(id) { fichaActualID = id; document.getElementById('editor-ficha-ui').style.display = 'block'; const f = fichasDB[id]; ['nombre','hp','ca','ini','vel','fue','des','con','int','sab','car','notas'].forEach(c => document.getElementById(`ficha-${c}`).value = f[c] || ""); renderizarFichasUI(); }
 function guardarFichaActual() { if(!fichaActualID) return; const f = fichasDB[fichaActualID]; ['nombre','hp','ca','ini','vel','fue','des','con','int','sab','car','notas'].forEach(c => f[c] = document.getElementById(`ficha-${c}`).value); localStorage.setItem('fichasDM', JSON.stringify(fichasDB)); renderizarFichasUI(); }
 function exportarFichaSeleccionada() { if(!fichaActualID) return; const f = fichasDB[fichaActualID]; const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(f)); const a = document.createElement('a'); a.href = dataStr; a.download = `${f.nombre}_ficha.json`; a.click(); }
+function añadirItemInventario() {
+    if (!fichaActualID) return;
 
+    const nombre = prompt("Nombre del objeto:");
+    if (!nombre) return;
+
+    const cantidad = parseInt(prompt("Cantidad:", "1")) || 1;
+
+    fichasDB[fichaActualID].inventario.push({
+        nombre,
+        cantidad
+    });
+
+    guardarFichaActual();
+    renderizarInventario();
+}
+
+function borrarItemInventario(index) {
+    if (!fichaActualID) return;
+
+    fichasDB[fichaActualID].inventario.splice(index, 1);
+
+    guardarFichaActual();
+    renderizarInventario();
+}
+
+function renderizarInventario() {
+    if (!fichaActualID) return;
+
+    const contenedor = document.getElementById('lista-inventario');
+
+    if (!contenedor) return;
+
+    contenedor.innerHTML = '';
+
+    const items = fichasDB[fichaActualID].inventario || [];
+
+    items.forEach((item, index) => {
+        const div = document.createElement('div');
+
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.marginBottom = '5px';
+        div.style.background = '#111';
+        div.style.padding = '8px';
+        div.style.borderRadius = '4px';
+
+        div.innerHTML = `
+            <span>${item.nombre} x${item.cantidad}</span>
+            <button onclick="borrarItemInventario(${index})">❌</button>
+        `;
+
+        contenedor.appendChild(div);
+    });
+}
+function renderizarSkills() {
+    if (!fichaActualID) return;
+
+    const contenedor = document.getElementById('lista-skills');
+    if (!contenedor) return;
+
+    contenedor.innerHTML = '';
+
+    const skills = fichasDB[fichaActualID].skills || {};
+
+    Object.keys(skills).forEach(skill => {
+        const fila = document.createElement('div');
+
+        fila.style.display = 'flex';
+        fila.style.justifyContent = 'space-between';
+        fila.style.marginBottom = '5px';
+
+        fila.innerHTML = `
+            <span>${skill}</span>
+            <input
+                type="number"
+                value="${skills[skill]}"
+                onchange="actualizarSkill('${skill}', this.value)"
+                style="width:60px;"
+            >
+        `;
+
+        contenedor.appendChild(fila);
+    });
+}
+
+function actualizarSkill(skill, valor) {
+    if (!fichaActualID) return;
+
+    fichasDB[fichaActualID].skills[skill] = parseInt(valor) || 0;
+
+    guardarFichaActual();
+}
+function renderizarConjuros() {
+    if (!fichaActualID) return;
+
+    const contenedor = document.getElementById('lista-conjuros');
+
+    if (!contenedor) return;
+
+    contenedor.innerHTML = '';
+
+    const datos = fichasDB[fichaActualID].conjuros;
+
+    Object.keys(datos).forEach(nivel => {
+        const c = datos[nivel];
+
+        const div = document.createElement('div');
+
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.marginBottom = '8px';
+        div.style.background = '#111';
+        div.style.padding = '8px';
+
+        div.innerHTML = `
+            <span>${nivel}</span>
+            <span>${c.usados} / ${c.max}</span>
+        `;
+
+        contenedor.appendChild(div);
+    });
+}
 renderizarWiki(); renderizarGalerias(); renderizarFichasUI();
 window.addEventListener('DOMContentLoaded', renderizarGalerias);
