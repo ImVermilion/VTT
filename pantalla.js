@@ -5,14 +5,44 @@ const boxDados = document.getElementById('notificacion-dados-3d');
 const arenaDados = document.getElementById('arena-3d-jugadores');
 const elementoAudio = document.getElementById('audio-ambiente-vtt');
 
-let temporizadorDado;
+// Mapa de referencia para saber qué atributo usa cada habilidad de 5e
+const mapaSkills5e = {
+    acrobacias: 'des', arcano: 'int', atletismo: 'fue', engaño: 'car', historia: 'int',
+    interpretacion: 'car', intimidacion: 'car', investigacion: 'int', juego_manos: 'des',
+    medicina: 'sab', naturaleza: 'int', percepcion: 'sab', perspicacia: 'sab',
+    persuasion: 'car', religion: 'int', sigilo: 'des', supervivencia: 'sab', trato_animales: 'sab'
+};
 
-// --- GESTIÓN VISTAS JUGADOR ---
-function cambiarTabJugador(idTab, btn) {
-    document.querySelectorAll('.player-vista').forEach(p => p.classList.remove('activa'));
-    document.querySelectorAll('.player-nav button').forEach(b => b.classList.remove('activa'));
-    document.getElementById(idTab).classList.add('activa');
-    btn.classList.add('activa');
+// --- ZOOM Y PAN (Arrastrar mapa) ---
+let zoomMapa = 1; let mapaPoscX = 0; let mapaPoscY = 0;
+let arrastrandoMapa = false; let startX, startY;
+const contMapa = document.getElementById('contenedor-mapa-scroll');
+
+if(contMapa) {
+    contMapa.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomPaso = 0.1;
+        if(e.deltaY < 0) zoomMapa += zoomPaso;
+        else zoomMapa = Math.max(0.2, zoomMapa - zoomPaso);
+        document.getElementById('wrapper-mapa').style.transform = `scale(${zoomMapa})`;
+    });
+
+    document.getElementById('wrapper-mapa').addEventListener('mousedown', (e) => {
+        if(e.target.classList.contains('token-jugador')) return; 
+        arrastrandoMapa = true;
+        startX = e.clientX - mapaPoscX;
+        startY = e.clientY - mapaPoscY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if(!arrastrandoMapa) return;
+        mapaPoscX = e.clientX - startX;
+        mapaPoscY = e.clientY - startY;
+        document.getElementById('wrapper-mapa').style.left = mapaPoscX + 'px';
+        document.getElementById('wrapper-mapa').style.top = mapaPoscY + 'px';
+    });
+
+    window.addEventListener('mouseup', () => { arrastrandoMapa = false; });
 }
 
 // --- FICHA Y AUTO-GUARDADO ---
@@ -22,30 +52,109 @@ document.getElementById('notas-privadas-jugador').value = localStorage.getItem('
 function guardarNombreLocal() { localStorage.setItem('miNombreJugadorVTT', document.getElementById('nombre-jugador').value); }
 function guardarNotasJugador() { localStorage.setItem('misNotasJugadorVTT', document.getElementById('notas-privadas-jugador').value); }
 
+let miPersonajeActual = null;
+
+function actualizarInputsDeInterfaz() {
+    if(!miPersonajeActual) return;
+    
+    document.getElementById('f-nombre').value = miPersonajeActual.nombre || "Héroe";
+    document.getElementById('f-hp').value = miPersonajeActual.hp_actual || 0;
+    document.getElementById('f-ca').value = miPersonajeActual.ca || 10;
+    document.getElementById('f-oro').value = miPersonajeActual.oro || 0;
+
+    ['fue','des','con','int','sab','car'].forEach(a => {
+        const valor = miPersonajeActual.atributos[a] || 10;
+        document.getElementById(`f-${a}`).value = valor;
+        const mod = miPersonajeActual.obtenerModificador(a);
+        document.getElementById(`m-${a}`).innerText = mod >= 0 ? `+${mod}` : `${mod}`;
+    });
+
+    (miPersonajeActual);
+}
+
+function actualizarDatoJugador(clave, valor) {
+    if(!miPersonajeActual) return;
+    if(clave === 'nombre') miPersonajeActual[clave] = valor;
+    else miPersonajeActual[clave] = parseInt(valor) || 0;
+}
+
+function actualizarDatoJugadorAtributo(atrib, valor) {
+    if(!miPersonajeActual) return;
+    miPersonajeActual.atributos[atrib] = parseInt(valor) || 10;
+    actualizarInputsDeInterfaz(); 
+}
+
+function descargarFichaJugador() {
+    if(!miPersonajeActual) { alert("Carga una ficha primero."); return; }
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(miPersonajeActual.exportarJSON()); 
+    const a = document.createElement('a'); 
+    a.href = dataStr; 
+    a.download = `${miPersonajeActual.nombre}_actualizado.json`; 
+    a.click(); 
+}
+
 if(document.getElementById('upload-ficha-json')) {
     document.getElementById('upload-ficha-json').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = function(evt) {
-            try {
-                const data = JSON.parse(evt.target.result);
-                ['nombre','hp','ca','ini','vel'].forEach(c => {
-                    if(document.getElementById(`f-${c}`)) document.getElementById(`f-${c}`).innerText = data[c] || "-";
-                });
-                ['fue','des','con','int','sab','car'].forEach(a => {
-                    if(document.getElementById(`f-${a}`)) document.getElementById(`f-${a}`).innerText = data[a] || "10";
-                    let mod = Math.floor((parseInt(data[a] || 10) - 10) / 2);
-                    if(document.getElementById(`m-${a}`)) document.getElementById(`m-${a}`).innerText = mod >= 0 ? `+${mod}` : `${mod}`;
-                });
-                if(!document.getElementById('nombre-jugador').value) {
-                    document.getElementById('nombre-jugador').value = data.nombre || "Héroe";
-                    guardarNombreLocal();
+            if (typeof Personaje !== 'undefined') {
+                miPersonajeActual = Personaje.importarJSON(evt.target.result);
+                if (miPersonajeActual) {
+                    if(!document.getElementById('nombre-jugador').value) {
+                        document.getElementById('nombre-jugador').value = miPersonajeActual.nombre || "Héroe";
+                        guardarNombreLocal();
+                    }
+                    actualizarInputsDeInterfaz();
+                } else {
+                    alert("Error al importar la ficha.");
                 }
-            } catch(err) { alert("Archivo JSON inválido."); }
+            } else {
+                alert("Error: Faltan las reglas (ficha.js).");
+            }
         };
         reader.readAsText(file);
     });
+}
+
+function renderizarFichaCompletaJugador(pj) {
+    // 1. Sincronizar datos básicos
+    document.getElementById('f-hp').value = pj.hp_actual || 0;
+    document.getElementById('f-ca').value = pj.ca || 10;
+    
+    // 2. Monedas (Oro, Plata, Bronce)
+    if(pj.monedas) {
+        document.getElementById('f-oro').value = pj.monedas.oro || 0;
+        document.getElementById('f-plata').value = pj.monedas.plata || 0;
+        document.getElementById('f-bronce').value = pj.monedas.bronce || 0;
+    }
+
+    // 3. Renderizar Conjuros de forma limpia (sin agobiar)
+    const container = document.getElementById('p-conjuros') || crearContenedorConjuros();
+    container.innerHTML = `<h4 style="color:#9b59b6;">🔮 Conjuros</h4>`;
+    
+    // Trucos
+    container.innerHTML += `<p><strong>Trucos:</strong> ${pj.conjuros.trucos.join(', ')}</p>`;
+    
+    // Niveles 1-9
+    for(let i=1; i<=9; i++) {
+        const nivel = pj.conjuros[`nivel${i}`];
+        if(nivel && nivel.max > 0) {
+            container.innerHTML += `
+                <div style="font-size: 0.85rem; border-bottom: 1px solid #333; padding: 2px;">
+                    <strong>Nivel ${i}:</strong> ${nivel.usados}/${nivel.max} usados | ${nivel.lista.join(', ')}
+                </div>`;
+        }
+    }
+}
+
+// Función auxiliar para que el HTML de jugador tenga donde pintar conjuros
+function crearContenedorConjuros() {
+    const div = document.createElement('div');
+    div.id = 'p-conjuros';
+    document.querySelector('.player-ficha-container').appendChild(div);
+    return div;
 }
 
 // --- ENVIAR TIRADA (Supabase Realtime) ---
@@ -56,9 +165,7 @@ function procesarTiradaJugador(caras, mod, motivo) {
     const modificador = parseInt(mod || 0);
     const total = baseRoll + modificador;
     
-    const paquete = {
-        quien: nick, caras: numCaras, resultado: baseRoll, mod: modificador, total: total, motivo: motivo, tiempo: Date.now()
-    };
+    const paquete = { quien: nick, caras: numCaras, resultado: baseRoll, mod: modificador, total: total, motivo: motivo, tiempo: Date.now() };
     
     if (typeof canalVTT !== 'undefined') {
         canalVTT.send({ type: 'broadcast', event: 'dado-jugador', payload: paquete });
@@ -67,7 +174,9 @@ function procesarTiradaJugador(caras, mod, motivo) {
 }
 
 function tirarAtributoJugador(nombreAtrib, idScore) {
-    const score = document.getElementById(idScore).innerText;
+    const inputEl = document.getElementById(idScore);
+    // Solución al Bug: Lee el .value si es input, o .innerText si es div antiguo, o 10 por defecto
+    const score = inputEl.value || inputEl.innerText || 10; 
     const mod = Math.floor((parseInt(score) - 10) / 2);
     procesarTiradaJugador(20, mod, `Tirada de ${nombreAtrib}`);
 }
@@ -99,15 +208,6 @@ function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
     arenaDados.appendChild(dadoDiv);
     boxDados.classList.add('mostrar');
 
-    const hist = document.getElementById('historial-tiradas');
-    if (hist) {
-        const item = document.createElement('div');
-        item.style.padding = '6px';
-        item.style.borderBottom = '1px solid #333';
-        item.innerHTML = `<strong style="color:#2ecc71">${quien}</strong> tiró d${numCaras} <i>(${motivo})</i>: <b style="color:#3498db; font-size:1.2em">${total}</b>`;
-        hist.prepend(item);
-    }
-
     if(typeof reproducirSonidoDado === 'function') reproducirSonidoDado();
 
     setTimeout(() => {
@@ -120,17 +220,14 @@ function mostrarDadoFlotante(quien, caras, base, mod, motivo, total) {
 async function inicializarProyeccionOnline() {
     if (typeof supabaseClient === 'undefined') return;
 
-    // Carga inicial
     let resultadoDB = await supabaseClient.from('vtt_estado').select('*').eq('id', 1).single();
     if (resultadoDB.data) aplicarEstadoVTT(resultadoDB.data);
 
-    // Escuchar la Base de Datos (Seguridad de respaldo)
     supabaseClient.channel('cambios-db')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vtt_estado' }, payload => {
             aplicarEstadoVTT(payload.new);
         }).subscribe();
 
-    // Escuchar Broadcast Directo (Más rápido, evita parpadeos)
     canalVTT.on('broadcast', { event: 'estado-vtt' }, (mensaje) => {
         aplicarEstadoVTT(mensaje.payload);
     }).subscribe();
@@ -149,9 +246,7 @@ async function inicializarProyeccionOnline() {
     canalVTT.on('broadcast', { event: 'audio-comando' }, (mensaje) => {
         if(elementoAudio) {
             if (mensaje.payload.cmd === 'play') {
-                if (mensaje.payload.url && !elementoAudio.src.endsWith(mensaje.payload.url)) {
-                    elementoAudio.src = mensaje.payload.url;
-                }
+                if (mensaje.payload.url && !elementoAudio.src.endsWith(mensaje.payload.url)) elementoAudio.src = mensaje.payload.url;
                 elementoAudio.play().catch(()=>{});
             }
             if (mensaje.payload.cmd === 'pause') elementoAudio.pause();
@@ -160,10 +255,14 @@ async function inicializarProyeccionOnline() {
 }
 
 function aplicarEstadoVTT(estado) {
-    // Solución al bug: Comprobamos si la clave existe antes de intentar aplicarla o borrarla
     if ('mapa_url' in estado) {
-        if (estado.mapa_url) { imgMapa.src = estado.mapa_url; wrapperMapa.style.display = "inline-block"; }
-        else { imgMapa.src = ""; wrapperMapa.style.display = "none"; }
+        if (estado.mapa_url) { 
+            imgMapa.src = estado.mapa_url; 
+            wrapperMapa.style.display = "block"; // Asegura que el contenedor se muestra
+        } else { 
+            imgMapa.src = ""; 
+            wrapperMapa.style.display = "none"; 
+        }
     }
     
     if ('rejilla' in estado && capaRejilla) capaRejilla.style.display = estado.rejilla ? 'block' : 'none';

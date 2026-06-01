@@ -9,78 +9,80 @@
 
     <nav class="player-nav">
         <input type="text" id="nombre-jugador" placeholder="Tu Nombre..." style="background: #111; color: white; border: 1px solid #444; padding: 10px; border-radius: 4px;" oninput="guardarNombreLocal()">
-        <button onclick="cambiarTabJugador('v-mapa', this)" class="activa">🗺️ Mapa</button>
-        <button onclick="cambiarTabJugador('v-ficha', this)">👥 Mi Ficha</button>
-        <button onclick="cambiarTabJugador('v-dados', this)">🎲 Dados y Notas</button>
-        <button onclick="document.getElementById('audio-ambiente-vtt').play().catch(() => {}); this.style.display='none';" style="background: #e74c3c; animation: pulse 1s infinite;">🔊 Conectar Audio</button>
+        <button onclick="document.getElementById('upload-ficha-json').click()" style="background: #3498db;">📥 Cargar Ficha (.json)</button>
+        <button onclick="descargarFichaJugador()" style="background: #2ecc71;">💾 Guardar Cambios</button>
+        <input type="file" id="upload-ficha-json" accept=".json" style="display:none;">
+        <button onclick="document.getElementById('audio-ambiente-vtt').play().catch(() => {}); this.style.display='none';" style="background: #e74c3c; margin-left: auto; animation: pulse 1s infinite;">🔊 Conectar Audio</button>
     </nav>
 
-    <div id="v-mapa" class="player-vista activa">
-        <div class="centrador-mapa">
-            <div id="wrapper-mapa" class="wrapper-mapa" style="display: none;">
-                <img id="img-mapa" class="img-mapa" src="">
-                <div id="capa-rejilla" class="rejilla"></div>
-            </div>
+    <div class="player-col-izquierda" id="contenedor-mapa-scroll">
+        <div id="wrapper-mapa" class="wrapper-mapa" style="display: none; position: absolute; top:0; left:0;">
+            <img id="img-mapa" class="img-mapa" src="" draggable="false">
+            <div id="capa-rejilla" class="rejilla"></div>
         </div>
     </div>
 
-    <div id="v-ficha" class="player-vista">
-        <div class="player-ficha-container">
-            <label style="background: #3498db; color: white; padding: 10px 20px; cursor: pointer; border-radius: 4px; display: inline-block; margin-bottom: 20px;">
-                📥 Cargar mi Ficha (.json) <input type="file" id="upload-ficha-json" accept=".json" style="display:none;">
-            </label>
-            <h1 id="f-nombre" style="color: #2ecc71; border-bottom: 2px solid #333; padding-bottom: 10px;">-</h1>
-            
-            <div class="grid-stats-player">
-                <div class="stat-box"><label>❤️ HP</label><div id="f-hp">-</div></div>
-                <div class="stat-box"><label>🛡️ CA</label><div id="f-ca">-</div></div>
-                <div class="stat-box"><label>⚡ INICIATIVA</label><div id="f-ini">-</div></div>
-                <div class="stat-box"><label>👟 VELOCIDAD</label><div id="f-vel">-</div></div>
-            </div>
-            
-            <h3 style="color:#aaa; text-align:center;">Atributos (Clic para tirar d20)</h3>
-            <div class="grid-atributos-player">
-                <div class="stat-box"><label>FUE</label><div id="f-fue">10</div><button onclick="tirarAtributoJugador('Fuerza', 'f-fue')" id="m-fue">+0</button></div>
-                <div class="stat-box"><label>DES</label><div id="f-des">10</div><button onclick="tirarAtributoJugador('Destreza', 'f-des')" id="m-des">+0</button></div>
-                <div class="stat-box"><label>CON</label><div id="f-con">10</div><button onclick="tirarAtributoJugador('Constitución', 'f-con')" id="m-con">+0</button></div>
-                <div class="stat-box"><label>INT</label><div id="f-int">10</div><button onclick="tirarAtributoJugador('Inteligencia', 'f-int')" id="m-int">+0</button></div>
-                <div class="stat-box"><label>SAB</label><div id="f-sab">10</div><button onclick="tirarAtributoJugador('Sabiduría', 'f-sab')" id="m-sab">+0</button></div>
-                <div class="stat-box"><label>CAR</label><div id="f-car">10</div><button onclick="tirarAtributoJugador('Carisma', 'f-car')" id="m-car">+0</button></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="v-dados" class="player-vista" style="flex-direction: column; align-items: center;">
-        <div class="player-dados-container">
+    <div class="player-col-derecha">
+        
+        <div class="stat-box" style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; background: #1a1a1a;">
             <button onclick="tirarDadoGenericoJugador(4)">d4</button>
             <button onclick="tirarDadoGenericoJugador(6)">d6</button>
             <button onclick="tirarDadoGenericoJugador(8)">d8</button>
             <button onclick="tirarDadoGenericoJugador(10)">d10</button>
             <button onclick="tirarDadoGenericoJugador(12)">d12</button>
-            <button onclick="tirarDadoGenericoJugador(20)">d20</button>
-            <button onclick="tirarDadoGenericoJugador(100)" style="grid-column: span 3; background: var(--accent);">d100</button>
+            <button onclick="tirarDadoGenericoJugador(20)" style="background: var(--accent);">d20</button>
         </div>
-        <div style="width: 100%; max-width: 600px; margin-top: 20px;">
-            <label style="color:#aaa; font-weight:bold;">Tus Notas Privadas:</label>
-            <textarea id="notas-privadas-jugador" placeholder="Escribe aquí tu inventario o secretos..." oninput="guardarNotasJugador()"></textarea>
+
+        <div class="player-ficha-container">
+            <input type="text" id="f-nombre" class="editable-input" style="font-size: 1.8rem; color: #2ecc71; text-align: left; margin-bottom: 10px; font-weight:bold;" value="Héroe" onchange="actualizarDatoJugador('nombre', this.value)">
+            
+            <div class="grid-ficha-limpia">
+                <div class="stat-box"><label>❤️ HP</label><input type="number" id="f-hp" class="editable-input" onchange="actualizarDatoJugador('hp_actual', this.value)"></div>
+                <div class="stat-box"><label>🛡️ CA</label><input type="number" id="f-ca" class="editable-input" onchange="actualizarDatoJugador('ca', this.value)"></div>
+                <div class="stat-box">
+                    <label>💰 MONEDAS</label>
+                    <div style="display:flex; justify-content:space-around; margin-top:5px;">
+                        <div><span style="color:gold; font-size:0.7rem;">O</span><input type="number" id="f-oro" class="editable-input" onchange="actualizarMonedaJugador('oro', this.value)" style="width:30px; padding:0; text-align:center;"></div>
+                        <div><span style="color:silver; font-size:0.7rem;">P</span><input type="number" id="f-plata" class="editable-input" onchange="actualizarMonedaJugador('plata', this.value)" style="width:30px; padding:0; text-align:center;"></div>
+                        <div><span style="color:#cd7f32; font-size:0.7rem;">B</span><input type="number" id="f-bronce" class="editable-input" onchange="actualizarMonedaJugador('bronce', this.value)" style="width:30px; padding:0; text-align:center;"></div>
+                    </div>
+                </div>
+                
+            </div>
+            
+            <h4 style="color:#aaa; text-align:center; border-bottom: 1px solid #333; padding-bottom:5px; margin-top:0;">Atributos</h4>
+            <div class="grid-ficha-limpia">
+                <div class="stat-box"><label>FUE</label><input type="number" id="f-fue" class="editable-input" onchange="actualizarDatoJugadorAtributo('fue', this.value)"><button onclick="tirarAtributoJugador('Fuerza', 'f-fue')" id="m-fue" style="margin-top:5px; width:100%;">+0</button></div>
+                <div class="stat-box"><label>DES</label><input type="number" id="f-des" class="editable-input" onchange="actualizarDatoJugadorAtributo('des', this.value)"><button onclick="tirarAtributoJugador('Destreza', 'f-des')" id="m-des" style="margin-top:5px; width:100%;">+0</button></div>
+                <div class="stat-box"><label>CON</label><input type="number" id="f-con" class="editable-input" onchange="actualizarDatoJugadorAtributo('con', this.value)"><button onclick="tirarAtributoJugador('Constitución', 'f-con')" id="m-con" style="margin-top:5px; width:100%;">+0</button></div>
+                <div class="stat-box"><label>INT</label><input type="number" id="f-int" class="editable-input" onchange="actualizarDatoJugadorAtributo('int', this.value)"><button onclick="tirarAtributoJugador('Inteligencia', 'f-int')" id="m-int" style="margin-top:5px; width:100%;">+0</button></div>
+                <div class="stat-box"><label>SAB</label><input type="number" id="f-sab" class="editable-input" onchange="actualizarDatoJugadorAtributo('sab', this.value)"><button onclick="tirarAtributoJugador('Sabiduría', 'f-sab')" id="m-sab" style="margin-top:5px; width:100%;">+0</button></div>
+                <div class="stat-box"><label>CAR</label><input type="number" id="f-car" class="editable-input" onchange="actualizarDatoJugadorAtributo('car', this.value)"><button onclick="tirarAtributoJugador('Carisma', 'f-car')" id="m-car" style="margin-top:5px; width:100%;">+0</button></div>
+            </div>
+
+            <div class="stat-box" style="text-align: left; background: #1a1a1a; margin-top:15px;">
+                <h4 style="color:#2ecc71; margin-top:0;">🎯 Habilidades</h4>
+                <div id="p-skills" style="display: grid; gap: 5px; font-size: 0.9rem;"></div>
+            </div>
+
+            <label style="color:#aaa; font-weight:bold; display:block; margin-top: 15px;">Notas Privadas / Inventario:</label>
+            <textarea id="notas-privadas-jugador" style="width: 100%; min-height: 200px; background: #111; color: white; border: 1px solid #333; padding: 10px; border-radius: 4px; box-sizing: border-box;" placeholder="Tu inventario libre..." oninput="guardarNotasJugador()"></textarea>
         </div>
     </div>
 
     <div id="notificacion-dados-3d"><div id="arena-3d-jugadores"></div></div>
-
     <audio id="audio-ambiente-vtt" loop></audio>
-
-   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
       const supabaseUrl = 'https://kbaxoysuotwwrolybenw.supabase.co';
       const supabaseKey = 'sb_publishable_ethKeei2lOPZUEXpkWr8bQ_DcbplFdt';
-      
-      // Usamos 'supabaseClient' para no chocar con la librería global
       const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
       const canalVTT = supabaseClient.channel('sala-partida');
     </script>
-
+    
+    <!-- ES VITAL QUE ESTE NOMBRE (fichas.js) SEA EL MISMO QUE EL DE TU ARCHIVO EN EL ORDENADOR -->
+    <script src="fichas.js"></script>
     <script src="pantalla.js"></script>
 </body>
 </html>

@@ -27,26 +27,10 @@
             <button onclick="cambiarVista('vista-editor')">📝 Wiki</button>
             <button onclick="cambiarVista('vista-fichas')">👥 Fichas</button>
             <button onclick="cambiarVista('vista-dados')">🎲 Arena</button>
-            <button onclick="exportarCampañaCompleta()"
-style="background:#9b59b6;color:white;">
-📦 Exportar Campaña
-</button>
-
-<label style="
-background:#e67e22;
-color:white;
-padding:5px 10px;
-cursor:pointer;
-border-radius:4px;
-">
-📥 Importar Campaña
-<input
-type="file"
-id="importar-campaña"
-accept=".json"
-style="display:none;"
-onchange="importarCampañaCompleta(this.files[0])">
-</label>
+            <button onclick="exportarCampañaCompleta()" style="background:#9b59b6;color:white;">📦 Exportar Campaña</button>
+            <label style="background:#e67e22; color:white; padding:5px 10px; cursor:pointer; border-radius:4px;">📥 Importar Campaña
+                <input type="file" id="importar-campaña" accept=".json" style="display:none;" onchange="importarCampañaCompleta(this.files[0])">
+            </label>
         </nav>
 
         <div id="vista-mapa-dm" class="dm-vista activa">
@@ -63,52 +47,19 @@ onchange="importarCampañaCompleta(this.files[0])">
             <textarea id="editor-contenido" placeholder="Historia, notas..." oninput="guardarArticuloActual()"></textarea>
         </div>
 
+        <!-- VISTA FICHAS (LIMPIA DE CÓDIGO BASURA) -->
         <div id="vista-fichas" class="dm-vista">
-            <hr style="margin:20px 0;border-color:#444;">
-
-<h3 style="color:#2ecc71;">🎒 Inventario</h3>
-
-<button onclick="añadirItemInventario()"
-style="background:#3498db;color:white;margin-bottom:10px;">
-+ Añadir objeto
-</button>
-
-<div id="lista-inventario"></div>
-
-<hr style="margin:20px 0;border-color:#444;">
-
-<h3 style="color:#2ecc71;">🎯 Habilidades</h3>
-<div id="lista-skills"></div>
-
-<hr style="margin:20px 0;border-color:#444;">
-
-<h3 style="color:#9b59b6;">🔮 Huecos de conjuro</h3>
-<div id="lista-conjuros"></div>
             <div style="margin-bottom: 15px; display: flex; gap: 10px;">
                 <button onclick="crearFichaNueva()" style="background: #2ecc71; color: white;">+ Nueva Ficha</button>
-                <button onclick="exportarFichaSeleccionada()" style="background: #f1c40f; color: black;">💾 Exportar</button>
-                <label style="background: #3498db; color: white; padding: 5px 10px; cursor: pointer; border-radius: 4px;">📥 Importar <input type="file" id="input-importar-ficha" accept=".json" style="display:none;"></label>
+                <button onclick="exportarFichaSeleccionada()" style="background: #f1c40f; color: black;">💾 Exportar Ficha</button>
             </div>
+            
             <div style="display: grid; grid-template-columns: 200px 1fr; gap: 15px; height: calc(100% - 50px);">
+                <!-- Lista de Fichas -->
                 <div style="background: #111; padding: 10px; border-radius: 5px; overflow-y: auto;" id="lista-fichas-ui"></div>
+                
+                <!-- El editor inyectado por dm.js va aquí -->
                 <div id="editor-ficha-ui" style="display: none; background: #222; padding: 15px; border-radius: 5px; overflow-y: auto;">
-                    <input type="text" id="ficha-nombre" class="input-ficha" style="font-size:1.5rem; font-weight:bold; border-bottom:2px solid #555;" placeholder="Nombre..." oninput="guardarFichaActual()">
-                    <div class="grid-stats-dm">
-                        <div><label>HP:</label><input type="text" id="ficha-hp" class="input-ficha" oninput="guardarFichaActual()"></div>
-                        <div><label>CA:</label><input type="text" id="ficha-ca" class="input-ficha" oninput="guardarFichaActual()"></div>
-                        <div><label>Iniciativa:</label><input type="text" id="ficha-ini" class="input-ficha" oninput="guardarFichaActual()"></div>
-                        <div><label>Velocidad:</label><input type="text" id="ficha-vel" class="input-ficha" oninput="guardarFichaActual()"></div>
-                    </div>
-                    <div class="grid-atributos-dm" style="margin-top: 15px;">
-                        <div><label>FUE</label><input type="text" id="ficha-fue" class="input-ficha" oninput="guardarFichaActual()"></div>
-                        <div><label>DES</label><input type="text" id="ficha-des" class="input-ficha" oninput="guardarFichaActual()"></div>
-                        <div><label>CON</label><input type="text" id="ficha-con" class="input-ficha" oninput="guardarFichaActual()"></div>
-                        <div><label>INT</label><input type="text" id="ficha-int" class="input-ficha" oninput="guardarFichaActual()"></div>
-                        <div><label>SAB</label><input type="text" id="ficha-sab" class="input-ficha" oninput="guardarFichaActual()"></div>
-                        <div><label>CAR</label><input type="text" id="ficha-car" class="input-ficha" oninput="guardarFichaActual()"></div>
-                    </div>
-                    <textarea id="ficha-notas" style="width: 100%; height: 150px; background: #111; color: white; border: 1px solid #444; padding: 10px; margin-top:10px;" oninput="guardarFichaActual()" placeholder="Notas..."></textarea>
-                    <button onclick="borrarFichaActual()" style="background: #e74c3c; color: white; margin-top: 10px;">Borrar Ficha</button>
                 </div>
             </div>
         </div>
@@ -164,7 +115,7 @@ style="background:#3498db;color:white;margin-bottom:10px;">
     </footer>
 
     <audio id="audio-ambiente-dm" loop></audio>
- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script>
       const supabaseUrl = 'https://kbaxoysuotwwrolybenw.supabase.co';
@@ -173,6 +124,8 @@ style="background:#3498db;color:white;margin-bottom:10px;">
       const canalVTT = supabaseClient.channel('sala-partida');
     </script>
 
+    <!-- ESTO ERA LO QUE FALTABA PARA QUE EL DM PUEDA CREAR FICHAS -->
+    <script src="fichas.js"></script>
     <script src="dm.js"></script>
 </body>
 </html>
